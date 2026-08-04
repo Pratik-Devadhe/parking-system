@@ -135,7 +135,7 @@ function VehiclesPage() {
             <form onSubmit={handleAddVehicle} className="vehicle-form">
               <div>
                 <label className="booking-field-label">
-                  LICENSE PLATE NUMBER *
+                  LICENSE PLATE NUMBER *``
                 </label>
                 <input
                   type="text"
