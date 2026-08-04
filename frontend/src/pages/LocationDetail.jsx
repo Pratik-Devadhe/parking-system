@@ -141,16 +141,21 @@ function LocationDetail() {
           <p className="location-detail-filter-sub">Click an open slot to lock in instant reservation</p>
         </div>
 
-        {["AVAILABLE" , "OCCUPIED" , "MAINTENANCE" , "RESERVED"].map( (m) => (
-          <div className="location-detail-filter-btns">
-              <button
-                className={`btn btn-sm ${vehicleFilter === 'ALL' ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setVehicleFilter('ALL')}
-              >{m}
-              </button>
+       
+       <div className="location-detail-filter-btns">
+  {["ALL", "AVAILABLE", "OCCUPIED", "MAINTENANCE", "RESERVED"].map((status) => (
+    <button
+      key={status}
+      className={`btn btn-sm ${
+        statusFilter === status ? "btn-primary" : "btn-secondary"
+      }`}
+      onClick={() => setStatusFilter(status)}
+    >
+      {status}
+    </button>
+  ))}
+</div>
 
-          </div>
-        ))}
         <div className="location-detail-filter-btns">
           <button 
             className={`btn btn-sm ${vehicleFilter === 'ALL' ? 'btn-primary' : 'btn-secondary'}`}
