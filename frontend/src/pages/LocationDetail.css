@@ -1,4 +1,4 @@
-/* LocationDetail Page Styles */
+/* LocationDetail Page Styles - Pure Black & White Monochromatic Setup */
 
 .location-detail-container {
   margin-bottom: 60px;
@@ -14,6 +14,10 @@
 .location-detail-header-card {
   padding: 32px;
   margin-bottom: 32px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-card);
+  border-radius: var(--radius-lg);
 }
 
 .location-detail-top-row {
@@ -27,7 +31,8 @@
 
 .location-detail-title {
   font-size: 2.2rem;
-  font-weight: 800;
+  font-weight: 900;
+  color: var(--text-main);
   margin-bottom: 6px;
 }
 
@@ -54,22 +59,22 @@
 
 .location-detail-stat-card {
   padding: 16px;
-  background: #070709;
+  background: var(--bg-subtle);
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border-light);
+  border: 1px solid var(--border-strong);
 }
 
 .location-detail-stat-label {
   font-size: 0.75rem;
   color: var(--text-muted);
-  font-weight: 700;
+  font-weight: 800;
   margin-bottom: 4px;
 }
 
 .location-detail-stat-val {
   font-size: 1.4rem;
-  font-weight: 800;
-  color: #ffffff;
+  font-weight: 900;
+  color: var(--text-main);
 }
 
 .location-detail-filter-bar {
@@ -83,7 +88,8 @@
 
 .location-detail-filter-title {
   font-size: 1.4rem;
-  font-weight: 800;
+  font-weight: 900;
+  color: var(--text-main);
 }
 
 .location-detail-filter-sub {
@@ -108,21 +114,26 @@
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  border: 1px solid var(--border-light);
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-card);
+  border-radius: var(--radius-md);
   transition: transform 0.2s ease, border-color 0.2s ease;
 }
 
 .slot-card:hover {
   transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
+  border-color: var(--primary-blue);
 }
 
 .slot-card.available {
-  border-color: rgba(16, 185, 129, 0.4);
+  border-color: var(--border-strong);
 }
 
 .slot-card.occupied {
-  border-color: rgba(239, 68, 68, 0.3);
-  opacity: 0.75;
+  border-color: var(--border-light);
+  opacity: 0.85;
 }
 
 .slot-card-header {
@@ -135,34 +146,35 @@
 .slot-card-number {
   font-size: 1.5rem;
   font-weight: 900;
-  color: #ffffff;
+  color: var(--text-main);
 }
 
 .slot-card-category {
   font-size: 0.8rem;
   color: var(--text-muted);
   margin-bottom: 16px;
+  font-weight: 700;
 }
 
 .slot-card-rate-box {
-  background: #070709;
+  background: var(--bg-subtle);
   border-radius: var(--radius-sm);
   padding: 10px 14px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
-  border: 1px solid var(--border-light);
+  border: 1px solid var(--border-strong);
 }
 
 .slot-card-rate-lbl {
   font-size: 0.75rem;
   color: var(--text-muted);
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .slot-card-rate-val {
   font-size: 1.1rem;
-  font-weight: 800;
-  color: #ffffff;
+  font-weight: 900;
+  color: var(--text-main);
 }

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import QRCode from "react-qr-code";
 import { apiService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { 
@@ -11,7 +12,9 @@ import {
   QrCode, 
   LogOut, 
   LogIn, 
-  Calendar
+  Calendar,
+  AlertTriangle,
+  Send
 } from 'lucide-react';
 import './BookingsPage.css';
 
@@ -21,14 +24,20 @@ function BookingsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedPassBooking, setSelectedPassBooking] = useState(null);
 
+  // Dispute state
+  const [showDisputeModal, setShowDisputeModal] = useState(false);
+  const [disputeBooking, setDisputeBooking] = useState(null);
+  const [disputeReason, setDisputeReason] = useState('');
+  const [disputeDesc, setDisputeDesc] = useState('');
+
   const fetchBookings = async () => {
     setLoading(true);
     if (user) {
       const data = await apiService.getBookingsByUser(user.id);
-      setBookings(data);
+      setBookings(data || []);
     } else {
       const data = await apiService.getAllBookings();
-      setBookings(data);
+      setBookings(data || []);
     }
     setLoading(false);
   };
@@ -54,12 +63,30 @@ function BookingsPage() {
     }
   };
 
+  const handleFileDisputeSubmit = async (e) => {
+    e.preventDefault();
+    if (!disputeBooking || !disputeReason) return;
+
+    await apiService.createDispute({
+      booking_id: disputeBooking.id,
+      user_id: user?.id || 1,
+      reason: disputeReason,
+      description: disputeDesc
+    });
+
+    alert('Dispute case submitted successfully! Support & Admin team notified.');
+    setShowDisputeModal(false);
+    setDisputeBooking(null);
+    setDisputeReason('');
+    setDisputeDesc('');
+  };
+
   return (
     <div>
       <div className="bookings-page-header">
         <h1 className="bookings-page-title">My Reservations & Digital Passes</h1>
         <p className="bookings-page-sub">
-          Manage active parking reservations, access gate QR entry tokens, and view session history.
+          Manage active parking reservations, access gate QR entry tokens, view status history & submit support disputes.
         </p>
       </div>
 
@@ -81,7 +108,9 @@ function BookingsPage() {
       ) : (
         <div className="bookings-list">
           {bookings.map((b) => {
-            const isConfirmed = b.booking_status === 'CONFIRMED' || b.booking_status === 'PENDING';
+            const isConfirmed = b.booking_status === 'CONFIRMED';
+            const isPending = b.booking_status === 'PENDING';
+            const isActive = b.booking_status === 'ACTIVE';
             const isCompleted = b.booking_status === 'COMPLETED';
             const isCancelled = b.booking_status === 'CANCELLED';
 
@@ -97,7 +126,7 @@ function BookingsPage() {
                     <div className="booking-card-info-header">
                       <h3 className="booking-card-id">Booking #{b.id}</h3>
                       <span className={`badge ${
-                        isConfirmed ? 'badge-available' : isCompleted ? 'badge-dark' : 'badge-occupied'
+                        isConfirmed || isActive ? 'badge-available' : isPending ? 'badge-pending' : isCompleted ? 'badge-dark' : 'badge-occupied'
                       }`}>
                         {b.booking_status}
                       </span>
@@ -105,7 +134,7 @@ function BookingsPage() {
 
                     <div className="booking-card-location">
                       <MapPin size={16} color="#94a3b8" />
-                      {b.location_name || 'Apex Grand Garage'}
+                      {b.parking_name || b.location_name || 'Apex Grand Garage'}
                     </div>
 
                     <div className="booking-card-meta-list">
@@ -113,7 +142,7 @@ function BookingsPage() {
                         <Car size={14} /> Plate: <strong className="booking-card-meta-text">{b.vehicle_number || 'Registered Vehicle'}</strong>
                       </div>
                       <div className="booking-card-meta-item">
-                        <Clock size={14} /> Start: <strong className="booking-card-meta-text">{new Date(b.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong>
+                        <Clock size={14} /> Start: <strong className="booking-card-meta-text">{new Date(b.start_time).toLocaleString()}</strong>
                       </div>
                     </div>
                   </div>
@@ -127,28 +156,38 @@ function BookingsPage() {
                   </div>
 
                   <div className="booking-card-action-btns">
-                    {isConfirmed && (
+                    {isPending && (
+                      <span className="badge badge-pending">
+                        Waiting for Owner Approval
+                      </span>
+                    )}
+
+                    {(isConfirmed || isActive) && (
                       <>
                         <button 
                           className="btn btn-secondary btn-sm"
                           onClick={() => setSelectedPassBooking(b)}
                         >
-                          <QrCode size={16} /> Entry Pass
+                          <QrCode size={16} /> Digital Pass
                         </button>
 
-                        <button 
-                          className="btn btn-primary btn-sm"
-                          onClick={() => handleCheckIn(b.id)}
-                        >
-                          <LogIn size={16} /> Check-In
-                        </button>
+                        {isConfirmed && (
+                          <button 
+                            className="btn btn-primary btn-sm"
+                            onClick={() => handleCheckIn(b.id)}
+                          >
+                            <LogIn size={16} /> Check-In Gate
+                          </button>
+                        )}
 
-                        <button 
-                          className="btn btn-secondary btn-sm"
-                          onClick={() => handleCheckOut(b.id)}
-                        >
-                          <LogOut size={16} /> Check-Out
-                        </button>
+                        {isActive && (
+                          <button 
+                            className="btn btn-primary btn-sm"
+                            onClick={() => handleCheckOut(b.id)}
+                          >
+                            <LogOut size={16} /> Check-Out Gate
+                          </button>
+                        )}
 
                         <button 
                           className="btn btn-danger btn-sm"
@@ -159,22 +198,75 @@ function BookingsPage() {
                       </>
                     )}
 
-                    {isCompleted && (
-                      <span className="badge badge-dark">
-                        <CheckCircle2 size={14} color="#10b981" /> Completed Session
-                      </span>
-                    )}
-
-                    {isCancelled && (
-                      <span className="badge badge-occupied">
-                        <XCircle size={14} /> Cancelled
-                      </span>
-                    )}
+                    {/* Dispute Button */}
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      style={{ fontSize: '0.78rem' }}
+                      onClick={() => {
+                        setDisputeBooking(b);
+                        setShowDisputeModal(true);
+                      }}
+                    >
+                      <AlertTriangle size={14} /> Report Issue
+                    </button>
                   </div>
                 </div>
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* DISPUTE MODAL */}
+      {showDisputeModal && disputeBooking && (
+        <div className="modal-overlay" onClick={() => setShowDisputeModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+            <h3 style={{ fontSize: '1.3rem', fontWeight: '800', marginBottom: '8px' }}>
+              Submit Dispute / Issue Ticket
+            </h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '20px' }}>
+              Booking #{disputeBooking.id} &bull; {disputeBooking.parking_name}
+            </p>
+
+            <form onSubmit={handleFileDisputeSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label className="field-label">ISSUE REASON *</label>
+                <select
+                  className="input-field"
+                  value={disputeReason}
+                  onChange={(e) => setDisputeReason(e.target.value)}
+                  required
+                >
+                  <option value="">Select reason...</option>
+                  <option value="Incorrect Billing / Pricing">Incorrect Billing / Fee Issue</option>
+                  <option value="Slot Occupied by Unauthorized Vehicle">Slot Occupied by Unauthorized Vehicle</option>
+                  <option value="Barrier Gate Failed to Open">Barrier Gate Failed to Open</option>
+                  <option value="Facility Facility Damage / Safety">Facility Safety / Maintenance Concern</option>
+                  <option value="Other">Other Issue</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="field-label">DETAILED DESCRIPTION</label>
+                <textarea
+                  className="input-field"
+                  rows="4"
+                  placeholder="Provide additional details for the support admin..."
+                  value={disputeDesc}
+                  onChange={(e) => setDisputeDesc(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowDisputeModal(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  <Send size={14} /> Submit Dispute
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
@@ -191,7 +283,7 @@ function BookingsPage() {
 
               <div className="qr-code-box">
                 <div style={{ width: '180px', height: '180px', background: '#000000', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '0.8rem', fontWeight: '800', letterSpacing: '2px', border: '4px solid #000' }}>
-                  [QR PASS #{selectedPassBooking.id}]
+                  <QRCode value={selectedPassBooking.id} size={200} />
                 </div>
               </div>
 

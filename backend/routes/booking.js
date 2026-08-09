@@ -1,43 +1,19 @@
-const express = require("express");
+const express = require('express');
 const router = express.Router();
+const bookingController = require('../controllers/booking.js');
 
-const bookingController = require("../controllers/booking");
-
-// Create Booking
-router.post("/", bookingController.createBooking);
-
-// Check Availability
-router.post("/availability", bookingController.checkAvailability);
-
-// Get All Bookings
-router.get(
-    '/',
-    bookingController.getAllBookings
-);
-
-// Get All Bookings of User
+router.get('/', bookingController.getAllBookings);
 router.get('/user/:userId', bookingController.getBookingsByUser);
-
-// Get Booking By ID
+router.get('/owner/:ownerId', bookingController.getBookingsByOwner);
+router.get('/owner/earnings/:ownerId', bookingController.getOwnerEarnings);
 router.get('/:id', bookingController.getBookingById);
-
-// Cancel Booking
-router.patch(
-    "/:id/cancel",
-    bookingController.cancelBooking
-);
-
-// Vehicle Check In
-router.post(
-    "/:id/checkin",
-    bookingController.checkIn
-);
-
-// Vehicle Check Out
-router.post(
-    "/:id/checkout",
-    bookingController.checkOut
-);
-
+router.post('/', bookingController.createBooking);
+router.post('/availability', bookingController.checkAvailability);
+router.post('/block', bookingController.blockSlotTimeframe);
+router.patch('/:id/approve', bookingController.approveBooking);
+router.patch('/:id/reject', bookingController.rejectBooking);
+router.patch('/:id/cancel', bookingController.cancelBooking);
+router.post('/:id/checkin', bookingController.checkIn);
+router.post('/:id/checkout', bookingController.checkOut);
 
 module.exports = router;

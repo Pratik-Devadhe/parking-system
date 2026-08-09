@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { apiService } from '../services/api';
 import { 
   ShieldCheck, 
   Plus, 
   Trash2, 
-  Edit3, 
   MapPin, 
   Layers, 
   Activity, 
@@ -16,22 +16,34 @@ import {
   XCircle, 
   RefreshCw,
   Sliders,
-  Settings
+  Settings,
+  AlertTriangle,
+  FileText,
+  UserCheck,
+  UserX,
+  ShieldAlert,
+  Lock,
+  ArrowRight,
+  Sparkles
 } from 'lucide-react';
 import './AdminDashboard.css';
 
 function AdminDashboard() {
+  const { user, role, switchRole } = useAuth();
+
   const [activeTab, setActiveTab] = useState('OVERVIEW');
   const [locations, setLocations] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [users, setUsers] = useState([]);
+  const [disputes, setDisputes] = useState([]);
+  const [settings, setSettings] = useState([]);
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
   // Modals
   const [showAddLocationModal, setShowAddLocationModal] = useState(false);
   const [showAddSlotModal, setShowAddSlotModal] = useState(false);
-  const [selectedLocationForSlot, setSelectedLocationForSlot] = useState(null);
 
   // Location Form
   const [newLocation, setNewLocation] = useState({
@@ -56,16 +68,22 @@ function AdminDashboard() {
 
   const loadAdminData = async () => {
     setLoading(true);
-    const [locs, bks, sess, usrList] = await Promise.all([
+    const [locs, bks, sess, usrList, dispList, setList, statData] = await Promise.all([
       apiService.getLocations(),
       apiService.getAllBookings(),
       apiService.getAllSessions(),
-      apiService.getAllUsers()
+      apiService.getAllUsers(),
+      apiService.getAllDisputes(),
+      apiService.getSettings(),
+      apiService.getAdminStats()
     ]);
-    setLocations(locs);
-    setBookings(bks);
-    setSessions(sess);
-    setUsers(usrList);
+    setLocations(locs || []);
+    setBookings(bks || []);
+    setSessions(sess || []);
+    setUsers(usrList || []);
+    setDisputes(dispList || []);
+    setSettings(setList || []);
+    setStats(statData);
     setLoading(false);
   };
 
@@ -77,7 +95,8 @@ function AdminDashboard() {
     e.preventDefault();
     if (!newLocation.name || !newLocation.address) return;
 
-    await apiService.createLocation(newLocation);
+    const data = await apiService.createLocation(newLocation);
+    console.log(data);
     setShowAddLocationModal(false);
     setNewLocation({
       name: '',
@@ -98,25 +117,84 @@ function AdminDashboard() {
     }
   };
 
-  const handleCreateSlot = async (e) => {
-    e.preventDefault();
-    if (!newSlot.slot_number || !newSlot.location_id) return;
-
-    await apiService.createSlot(newSlot);
-    setShowAddSlotModal(false);
+  const handleVerifyLocation = async (id, currentStatus) => {
+    await apiService.verifyLocation(id, !currentStatus);
     loadAdminData();
   };
 
-  const handleSlotStatusToggle = async (slotId, currentStatus) => {
-    const nextStatus = currentStatus === 'AVAILABLE' ? 'MAINTENANCE' : 'AVAILABLE';
-    await apiService.updateSlotStatus(slotId, nextStatus);
+  const handleVerifyUser = async (id, currentStatus) => {
+    await apiService.verifyUser(id, !currentStatus);
     loadAdminData();
   };
+
+  const handleToggleUserStatus = async (id, currentStatus) => {
+    const nextStatus = currentStatus === 'SUSPENDED' ? 'ACTIVE' : 'SUSPENDED';
+    await apiService.updateUserStatus(id, nextStatus);
+    loadAdminData();
+  };
+
+  const handleUpdateDisputeStatus = async (id, status) => {
+    await apiService.updateDisputeStatus(id, status);
+    loadAdminData();
+  };
+
+  const handleUpdateSetting = async (key, value) => {
+    await apiService.updateSetting(key, value);
+    loadAdminData();
+  };
+
+  // Real-world Portal Gatekeeper check
+  if (role !== 'ADMIN') {
+    return (
+      <div style={{ maxWidth: '680px', margin: '60px auto', padding: '0 20px' }}>
+        <div className="glass-card" style={{ padding: '40px', textAlign: 'center' }}>
+          <div style={{
+            width: '64px',
+            height: '64px',
+            background: 'var(--primary-gradient)',
+            borderRadius: '20px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#fff',
+            marginBottom: '20px',
+            boxShadow: 'var(--primary-glow)'
+          }}>
+            <ShieldCheck size={32} />
+          </div>
+
+          <span className="badge admin-badge" style={{ marginBottom: '12px', display: 'inline-flex' }}>
+            ADMIN ACCESS GATEWAY
+          </span>
+
+          <h2 style={{ fontSize: '1.8rem', fontWeight: '800', marginBottom: '12px' }}>
+            Restricted Admin Portal
+          </h2>
+
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: '1.6', marginBottom: '28px' }}>
+            You are currently browsing in <strong>{role}</strong> mode. Access to executive telemetry, owner verification desks, and platform pricing parameters requires Administrator credentials.
+          </p>
+
+          <div style={{ display: 'flex', gap: '14px', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button 
+              className="btn btn-primary btn-lg" 
+              onClick={() => {
+                switchRole('ADMIN');
+                loadAdminData();
+              }}
+            >
+              <Sparkles size={18} /> Switch to Admin Access Mode
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // KPIs
-  const totalRevenue = bookings.reduce((sum, b) => sum + (Number(b.total_amount) || 0), 0);
-  const activeSessionsCount = sessions.filter(s => !s.exit_time).length;
-  const totalSlotsCount = locations.reduce((sum, l) => sum + (Number(l.total_slots) || 0), 0);
+  const totalRevenue = stats?.total_revenue || bookings.reduce((sum, b) => sum + (Number(b.total_amount) || 0), 0);
+  const activeSessionsCount = stats?.active_sessions || sessions.filter(s => !s.exit_time).length;
+  const openDisputesCount = disputes.filter(d => d.status === 'OPEN').length;
 
   return (
     <div>
@@ -125,44 +203,48 @@ function AdminDashboard() {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
             <span className="badge admin-badge">
-              <ShieldCheck size={14} /> ADMIN & OWNER CONTROL CENTER
+              <ShieldCheck size={14} /> SYSTEM ADMIN CONTROL CENTER
             </span>
           </div>
-          <h1 className="admin-title">Facility Management Portal</h1>
+          <h1 className="admin-title">Executive Platform Oversight</h1>
           <p className="admin-subtitle">
-            Real-time barrier telemetry, slot pricing configurations, and user analytics
+            Verify parking owners, audit listings, monitor driver disputes & configure platform rules.
           </p>
         </div>
 
         <button className="btn btn-secondary" onClick={loadAdminData}>
-          <RefreshCw size={16} /> Sync Telemetry
+          <RefreshCw size={16} /> Refresh Telemetry
         </button>
       </div>
 
       {/* KPI STATS CARDS */}
       <div className="admin-kpi-grid">
         <div className="glass-card admin-kpi-card">
-          <div className="admin-kpi-label">TOTAL REVENUE GENERATED</div>
-          <div className="admin-kpi-value">${totalRevenue.toFixed(2)}</div>
-          <div className="admin-kpi-trend">+18.4% from last week</div>
+          <div className="admin-kpi-label">TOTAL PLATFORM REVENUE</div>
+          <div className="admin-kpi-value">${Number(totalRevenue).toFixed(2)}</div>
+          <div className="admin-kpi-trend">Gross Platform Volume</div>
         </div>
 
         <div className="glass-card admin-kpi-card">
-          <div className="admin-kpi-label">ACTIVE GATE SESSIONS</div>
-          <div className="admin-kpi-value">{activeSessionsCount} Vehicles Parked</div>
+          <div className="admin-kpi-label">ACTIVE GARAGE SESSIONS</div>
+          <div className="admin-kpi-value">{activeSessionsCount} Parked</div>
           <div style={{ fontSize: '0.78rem', color: 'var(--text-subtle)', marginTop: '6px' }}>Live Barrier Monitoring</div>
         </div>
 
         <div className="glass-card admin-kpi-card">
-          <div className="admin-kpi-label">TOTAL MANAGED LOCATIONS</div>
-          <div className="admin-kpi-value">{locations.length} Facilities</div>
-          <div className="admin-kpi-trend">{totalSlotsCount} Total Capacity</div>
+          <div className="admin-kpi-label">OPEN USER DISPUTES</div>
+          <div className="admin-kpi-value" style={{ color: openDisputesCount > 0 ? 'var(--status-occ-text)' : 'var(--text-main)' }}>
+            {openDisputesCount} Tickets
+          </div>
+          <div style={{ fontSize: '0.78rem', color: 'var(--text-subtle)', marginTop: '6px' }}>Requires Admin Audit</div>
         </div>
 
         <div className="glass-card admin-kpi-card">
-          <div className="admin-kpi-label">TOTAL REGISTERED USERS</div>
-          <div className="admin-kpi-value">{users.length} Users</div>
-          <div style={{ fontSize: '0.78rem', color: 'var(--text-subtle)', marginTop: '6px' }}>Drivers & Owners</div>
+          <div className="admin-kpi-label">MANAGED OWNERS & USERS</div>
+          <div className="admin-kpi-value">{users.length} Registered</div>
+          <div style={{ fontSize: '0.78rem', color: 'var(--text-subtle)', marginTop: '6px' }}>
+            {stats?.owner_count || users.filter(u => u.role === 'OWNER').length} Property Owners
+          </div>
         </div>
       </div>
 
@@ -170,11 +252,12 @@ function AdminDashboard() {
       <div className="admin-tabs">
         {[
           { id: 'OVERVIEW', label: 'Overview & Telemetry', icon: Activity },
-          { id: 'LOCATIONS', label: 'Locations Manager', icon: MapPin },
-          { id: 'SLOTS', label: 'Slot Control Grid', icon: Layers },
-          { id: 'BOOKINGS', label: 'Master Bookings', icon: CalendarCheck },
-          { id: 'SESSIONS', label: 'Live Barrier Log', icon: Car },
-          { id: 'USERS', label: 'User Directory', icon: Users }
+          { id: 'VERIFICATION', label: 'Owner & Listing Verification', icon: ShieldCheck },
+          { id: 'LOCATIONS', label: 'Locations Directory', icon: MapPin },
+          { id: 'DISPUTES', label: `Disputes Monitor (${openDisputesCount})`, icon: AlertTriangle },
+          { id: 'BOOKINGS', label: 'Master Bookings Audit', icon: CalendarCheck },
+          { id: 'SETTINGS', label: 'Pricing Rules & Guidelines', icon: Settings },
+          { id: 'USERS', label: 'User Accounts & Roles', icon: Users }
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -194,27 +277,92 @@ function AdminDashboard() {
       {activeTab === 'OVERVIEW' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', marginBottom: '60px' }}>
           <div className="glass-card" style={{ padding: '28px' }}>
-            <h3 style={{ fontSize: '1.3rem', fontWeight: '800', marginBottom: '16px' }}>Live Facility Network Status</h3>
+            <h3 style={{ fontSize: '1.3rem', fontWeight: '800', marginBottom: '16px' }}>Platform Network Overview & Health</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
-              {locations.map(loc => (
-                <div key={loc.id} style={{ background: '#070709', padding: '18px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                    <span style={{ fontWeight: '700', color: '#fff' }}>{loc.name}</span>
-                    <span className="badge badge-available">ACTIVE</span>
-                  </div>
-                  <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '8px' }}>{loc.address}</div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-subtle)' }}>
-                    <span>Capacity: {loc.total_slots} Slots</span>
-                    <span>Approval: {loc.approval_mode}</span>
-                  </div>
+              <div style={{ background: 'var(--bg-subtle)', padding: '20px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)' }}>
+                <div style={{ color: 'var(--text-subtle)', fontSize: '0.8rem', fontWeight: '700', marginBottom: '6px' }}>FACILITIES & LISTINGS</div>
+                <div style={{ fontSize: '1.8rem', fontWeight: '900', color: 'var(--text-main)' }}>{locations.length} Locations</div>
+                <div style={{ color: 'var(--status-avail-text)', fontSize: '0.8rem', marginTop: '6px', fontWeight: '700' }}>
+                  {locations.filter(l => l.is_verified).length} Verified by Admin
                 </div>
-              ))}
+              </div>
+
+              <div style={{ background: 'var(--bg-subtle)', padding: '20px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)' }}>
+                <div style={{ color: 'var(--text-subtle)', fontSize: '0.8rem', fontWeight: '700', marginBottom: '6px' }}>RESERVATION VOLUME</div>
+                <div style={{ fontSize: '1.8rem', fontWeight: '900', color: 'var(--text-main)' }}>{bookings.length} Bookings</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '6px' }}>
+                  {bookings.filter(b => b.booking_status === 'COMPLETED').length} Successfully Completed
+                </div>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* TAB 2: LOCATIONS MANAGER */}
+      {/* TAB 2: OWNER & LISTING VERIFICATION */}
+      {activeTab === 'VERIFICATION' && (
+        <div style={{ marginBottom: '60px' }}>
+          <h3 style={{ fontSize: '1.3rem', fontWeight: '800', marginBottom: '20px' }}>Verify Parking Owners & Listings</h3>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            {/* Owner Accounts Verification */}
+            <div className="glass-card" style={{ padding: '24px' }}>
+              <h4 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '16px' }}>Parking Owner Accounts Verification</h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {users.filter(u => u.role === 'OWNER').map(u => (
+                  <div key={u.id} style={{ padding: '16px', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontWeight: '800', color: 'var(--text-main)', fontSize: '1.05rem' }}>{u.full_name}</div>
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Email: {u.email} &bull; Phone: {u.phone}</div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span className={`badge ${u.is_verified ? 'badge-available' : 'badge-pending'}`}>
+                        {u.is_verified ? 'VERIFIED OWNER' : 'UNVERIFIED PENDING'}
+                      </span>
+                      <button
+                        className={`btn btn-sm ${u.is_verified ? 'btn-secondary' : 'btn-primary'}`}
+                        onClick={() => handleVerifyUser(u.id, u.is_verified)}
+                      >
+                        {u.is_verified ? 'Revoke Verification' : 'Verify Owner Account'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Listing Verification */}
+            <div className="glass-card" style={{ padding: '24px' }}>
+              <h4 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '16px' }}>Facility Listings Verification</h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {locations.map(loc => (
+                  <div key={loc.id} style={{ padding: '16px', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontWeight: '800', color: 'var(--text-main)', fontSize: '1.05rem' }}>{loc.name}</div>
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{loc.address} &bull; Owner ID #{loc.owner_id}</div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span className={`badge ${loc.is_verified ? 'badge-available' : 'badge-pending'}`}>
+                        {loc.is_verified ? 'LISTING APPROVED' : 'NEEDS ADMIN REVIEW'}
+                      </span>
+                      <button
+                        className={`btn btn-sm ${loc.is_verified ? 'btn-secondary' : 'btn-primary'}`}
+                        onClick={() => handleVerifyLocation(loc.id, loc.is_verified)}
+                      >
+                        {loc.is_verified ? 'Unapprove Listing' : 'Approve & Verify Listing'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: LOCATIONS DIRECTORY */}
       {activeTab === 'LOCATIONS' && (
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -229,23 +377,13 @@ function AdminDashboard() {
               <div key={loc.id} className="glass-card" style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '1.2rem', fontWeight: '800', color: '#fff' }}>{loc.name}</span>
+                    <span style={{ fontSize: '1.2rem', fontWeight: '800', color: 'var(--text-main)' }}>{loc.name}</span>
                     <span className="badge badge-dark">ID #{loc.id}</span>
                   </div>
                   <div style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>{loc.address} &bull; Capacity: {loc.total_slots} slots</div>
                 </div>
 
                 <div style={{ display: 'flex', gap: '10px' }}>
-                  <button 
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => {
-                      setSelectedLocationForSlot(loc);
-                      setNewSlot({ ...newSlot, location_id: loc.id });
-                      setShowAddSlotModal(true);
-                    }}
-                  >
-                    <Plus size={14} /> Add Slot
-                  </button>
                   <button 
                     className="btn btn-danger btn-sm"
                     onClick={() => handleDeleteLocation(loc.id)}
@@ -259,65 +397,67 @@ function AdminDashboard() {
         </div>
       )}
 
-      {/* TAB 3: SLOTS GRID */}
-      {activeTab === 'SLOTS' && (
+      {/* TAB 4: DISPUTES MONITOR */}
+      {activeTab === 'DISPUTES' && (
         <div style={{ marginBottom: '60px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <h3 style={{ fontSize: '1.3rem', fontWeight: '800' }}>Master Slot Telemetry & Status Override</h3>
-            <button 
-              className="btn btn-primary"
-              onClick={() => {
-                if (locations.length > 0) {
-                  setSelectedLocationForSlot(locations[0]);
-                  setNewSlot({ ...newSlot, location_id: locations[0].id });
-                  setShowAddSlotModal(true);
-                }
-              }}
-            >
-              <Plus size={16} /> Create New Slot
-            </button>
-          </div>
+          <h3 style={{ fontSize: '1.3rem', fontWeight: '800', marginBottom: '20px' }}>Driver & Owner Disputes Support Desk</h3>
 
-          <div className="glass-card" style={{ padding: '24px' }}>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '20px' }}>
-              Toggle maintenance locks or status overrides for any slot in real-time.
-            </p>
+          {disputes.length === 0 ? (
+            <div className="glass-card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+              <CheckCircle2 size={36} style={{ color: 'var(--status-avail-text)', marginBottom: '12px' }} />
+              <h4>No support disputes recorded</h4>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {disputes.map(d => (
+                <div key={d.id} className="glass-card" style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '1.1rem', fontWeight: '800', color: 'var(--text-main)' }}>Dispute #{d.id}</span>
+                      <span className={`badge ${d.status === 'OPEN' ? 'badge-pending' : d.status === 'RESOLVED' ? 'badge-available' : 'badge-dark'}`}>
+                        {d.status}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '0.88rem', color: 'var(--text-main)', fontWeight: '700', marginTop: '6px' }}>
+                      Reason: {d.reason}
+                    </div>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                      Booking ID #{d.booking_id} &bull; Driver: {d.user_name || `User #${d.user_id}`} ({d.user_email})
+                    </div>
+                    {d.description && (
+                      <p style={{ fontSize: '0.85rem', color: 'var(--text-subtle)', background: 'var(--bg-subtle)', padding: '10px', borderRadius: 'var(--radius-sm)', marginTop: '8px' }}>
+                        "{d.description}"
+                      </p>
+                    )}
+                  </div>
 
-            {locations.map(loc => (
-              <div key={loc.id} style={{ marginBottom: '28px' }}>
-                <h4 style={{ color: '#fff', fontSize: '1.1rem', fontWeight: '700', marginBottom: '14px' }}>
-                  {loc.name}
-                </h4>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '14px' }}>
-                  <button
-                    className="btn btn-secondary"
-                    style={{ borderStyle: 'dashed', padding: '16px', flexDirection: 'column', height: '100%' }}
-                    onClick={() => {
-                      setSelectedLocationForSlot(loc);
-                      setNewSlot({ ...newSlot, location_id: loc.id });
-                      setShowAddSlotModal(true);
-                    }}
-                  >
-                    <Plus size={20} />
-                    <span>Add Slot to Hub</span>
-                  </button>
+                  {d.status === 'OPEN' && (
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <button className="btn btn-primary btn-sm" onClick={() => handleUpdateDisputeStatus(d.id, 'RESOLVED')}>
+                        <CheckCircle2 size={14} /> Resolve Ticket
+                      </button>
+                      <button className="btn btn-danger btn-sm" onClick={() => handleUpdateDisputeStatus(d.id, 'REJECTED')}>
+                        <XCircle size={14} /> Dismiss
+                      </button>
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      {/* TAB 4: ALL BOOKINGS */}
+      {/* TAB 5: MASTER BOOKINGS */}
       {activeTab === 'BOOKINGS' && (
         <div style={{ marginBottom: '60px' }}>
-          <h3 style={{ fontSize: '1.3rem', fontWeight: '800', marginBottom: '20px' }}>System Bookings Master Registry</h3>
+          <h3 style={{ fontSize: '1.3rem', fontWeight: '800', marginBottom: '20px' }}>System Master Bookings Audit</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {bookings.map(b => (
               <div key={b.id} className="glass-card" style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <div style={{ fontSize: '1.05rem', fontWeight: '700', color: '#fff' }}>
-                    Booking #{b.id} &bull; User ID #{b.user_id}
+                  <div style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--text-main)' }}>
+                    Booking #{b.id} &bull; Driver ID #{b.user_id}
                   </div>
                   <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                     Slot: {b.slot_number || 'A-01'} | Vehicle: {b.vehicle_number || 'N/A'} | Fee: ${b.total_amount}
@@ -333,41 +473,63 @@ function AdminDashboard() {
         </div>
       )}
 
-      {/* TAB 5: SESSIONS */}
-      {activeTab === 'SESSIONS' && (
+      {/* TAB 6: PRICING GUIDELINES & SETTINGS */}
+      {activeTab === 'SETTINGS' && (
         <div style={{ marginBottom: '60px' }}>
-          <h3 style={{ fontSize: '1.3rem', fontWeight: '800', marginBottom: '20px' }}>Live Barrier Sessions Log</h3>
-          <div className="glass-card" style={{ padding: '24px' }}>
-            {sessions.map(s => (
-              <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light)', padding: '14px 0' }}>
-                <div>
-                  <div style={{ color: '#fff', fontWeight: '700' }}>Session #{s.id} (Booking #{s.booking_id})</div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>Entry: {new Date(s.entry_time).toLocaleString()}</div>
+          <h3 style={{ fontSize: '1.3rem', fontWeight: '800', marginBottom: '20px' }}>Pricing Guidelines & System Parameters</h3>
+
+          <div className="glass-card" style={{ padding: '28px' }}>
+            <h4 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '18px' }}>Platform Financial Parameters</h4>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              {settings.map(s => (
+                <div key={s.setting_key} style={{ padding: '16px', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
+                  <div>
+                    <div style={{ fontWeight: '800', color: 'var(--text-main)', fontSize: '0.95rem' }}>{s.setting_key}</div>
+                    <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{s.description}</div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <input
+                      type="text"
+                      className="input-field"
+                      style={{ width: '120px', padding: '6px 12px' }}
+                      defaultValue={s.value}
+                      onBlur={(e) => handleUpdateSetting(s.setting_key, e.target.value)}
+                    />
+                    <button className="btn btn-secondary btn-sm">Save</button>
+                  </div>
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <span className={`badge ${s.exit_time ? 'badge-dark' : 'badge-available'}`}>
-                    {s.exit_time ? 'Checked Out' : 'Active Inside Garage'}
-                  </span>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       )}
 
-      {/* TAB 6: USERS DIRECTORY */}
+      {/* TAB 7: USERS DIRECTORY */}
       {activeTab === 'USERS' && (
         <div style={{ marginBottom: '60px' }}>
-          <h3 style={{ fontSize: '1.3rem', fontWeight: '800', marginBottom: '20px' }}>User & Account Directory</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+          <h3 style={{ fontSize: '1.3rem', fontWeight: '800', marginBottom: '20px' }}>User Accounts & Access Rules</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
             {users.map(u => (
               <div key={u.id} className="glass-card" style={{ padding: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                  <span style={{ fontWeight: '800', fontSize: '1.1rem', color: '#fff' }}>{u.full_name}</span>
-                  <span className="badge badge-dark">{u.role}</span>
+                  <span style={{ fontWeight: '800', fontSize: '1.1rem', color: 'var(--text-main)' }}>{u.full_name}</span>
+                  <span className={`badge ${u.status === 'SUSPENDED' ? 'badge-occupied' : 'badge-dark'}`}>{u.role} &bull; {u.status || 'ACTIVE'}</span>
                 </div>
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Email: {u.email}</div>
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Phone: {u.phone || 'N/A'}</div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Email: {u.id}</div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Id: {u.email}</div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '14px' }}>Phone: {u.phone || 'N/A'}</div>
+
+                <div style={{ display: 'flex', gap: '10px', borderTop: '1px solid var(--border-light)', paddingTop: '12px' }}>
+                  <button
+                    className={`btn btn-sm ${u.status === 'SUSPENDED' ? 'btn-primary' : 'btn-danger'}`}
+                    style={{ flex: 1 }}
+                    onClick={() => handleToggleUserStatus(u.id, u.status)}
+                  >
+                    {u.status === 'SUSPENDED' ? 'Re-activate Account' : 'Suspend Access'}
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -437,63 +599,6 @@ function AdminDashboard() {
 
               <button type="submit" className="btn btn-primary" style={{ marginTop: '10px', padding: '12px' }}>
                 Publish Location
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ADD SLOT MODAL */}
-      {showAddSlotModal && (
-        <div className="modal-overlay" onClick={() => setShowAddSlotModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
-            <h3 style={{ fontSize: '1.3rem', fontWeight: '800', marginBottom: '20px' }}>Create Parking Slot</h3>
-            <form onSubmit={handleCreateSlot} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', marginBottom: '6px', color: 'var(--text-muted)' }}>
-                  SLOT NUMBER *
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. A-105"
-                  className="input-field"
-                  value={newSlot.slot_number}
-                  onChange={(e) => setNewSlot({ ...newSlot, slot_number: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', marginBottom: '6px', color: 'var(--text-muted)' }}>
-                    CATEGORY
-                  </label>
-                  <select
-                    className="input-field"
-                    value={newSlot.vehicle_type}
-                    onChange={(e) => setNewSlot({ ...newSlot, vehicle_type: e.target.value })}
-                  >
-                    <option value="FOUR_WHEELER">Four-Wheeler</option>
-                    <option value="TWO_WHEELER">Two-Wheeler</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', marginBottom: '6px', color: 'var(--text-muted)' }}>
-                    HOURLY PRICE ($)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    className="input-field"
-                    value={newSlot.hourly_price}
-                    onChange={(e) => setNewSlot({ ...newSlot, hourly_price: Number(e.target.value) })}
-                  />
-                </div>
-              </div>
-
-              <button type="submit" className="btn btn-primary" style={{ marginTop: '10px', padding: '12px' }}>
-                Save Slot Configuration
               </button>
             </form>
           </div>

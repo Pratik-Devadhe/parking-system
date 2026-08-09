@@ -54,7 +54,7 @@ function BookingModal({ location, slot, onClose, onBookingSuccess }) {
 
     setSubmitting(true);
     try {
-      const slotId = slot ? slot.id : 101;
+      const slotId = slot.id;
       const startIso = new Date(startTime).toISOString();
       const endIso = new Date(endTime).toISOString();
 
@@ -86,6 +86,7 @@ function BookingModal({ location, slot, onClose, onBookingSuccess }) {
       }
     } catch (err) {
       setSubmitting(false);
+      console.log(err);
       setError('Error communicating with booking server.');
     }
   };
