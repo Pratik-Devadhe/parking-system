@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { User, Mail, Phone, Lock, Car, ShieldCheck, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { User, Mail, Phone, Lock, Car, ShieldCheck, Building2, ArrowRight, Globe } from 'lucide-react';
 import './Auth.css';
 
 function Signup() {
@@ -22,6 +22,15 @@ function Signup() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isAdminDomain, setIsAdminDomain] = useState(false);
+
+  useEffect(() => {
+    const hostname = window.location.hostname;
+    if (hostname.startsWith('admin.') || hostname === 'admin.localhost') {
+      setIsAdminDomain(true);
+      setFormData(prev => ({ ...prev, role: 'ADMIN' }));
+    }
+  }, []);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -42,6 +51,8 @@ function Signup() {
     if (res.success) {
       if (formData.role === 'ADMIN') {
         navigate('/admin');
+      } else if (formData.role === 'OWNER') {
+        navigate('/owner');
       } else {
         navigate('/');
       }
@@ -59,25 +70,41 @@ function Signup() {
           </div>
           <h2 className="auth-title">Create PARK-X Account</h2>
           <p className="auth-subtitle">
-            Register your vehicle fleet & book smart parking slots instantly
+            Join the smart parking network for Drivers, Parking Owners, and Admins
           </p>
+
+          <div className="auth-endpoint-notice">
+            <Globe size={13} color="var(--primary-teal)" />
+            <span>
+              {isAdminDomain 
+                ? 'Registering via admin.localhost (Admin Portal)' 
+                : 'Registering via localhost (Driver/Owner Portal)'}
+            </span>
+          </div>
         </div>
 
-        {/* Role Toggle Switch */}
-        <div className="auth-role-toggle">
+        {/* 3-Role Selection Switcher */}
+        <div className="auth-role-toggle 3-roles">
           <button
             type="button"
             onClick={() => setFormData({ ...formData, role: 'DRIVER' })}
             className={`auth-role-btn ${formData.role === 'DRIVER' ? 'active' : ''}`}
           >
-            <User size={15} /> Driver Account
+            <User size={14} /> Driver
+          </button>
+          <button
+            type="button"
+            onClick={() => setFormData({ ...formData, role: 'OWNER' })}
+            className={`auth-role-btn ${formData.role === 'OWNER' ? 'active' : ''}`}
+          >
+            <Building2 size={14} /> Owner
           </button>
           <button
             type="button"
             onClick={() => setFormData({ ...formData, role: 'ADMIN' })}
             className={`auth-role-btn ${formData.role === 'ADMIN' ? 'active' : ''}`}
           >
-            <ShieldCheck size={15} /> Facility Owner / Admin
+            <ShieldCheck size={14} /> Admin
           </button>
         </div>
 
@@ -106,7 +133,7 @@ function Signup() {
           <div className="auth-form-grid-2">
             <div>
               <label className="auth-field-label">
-                EMAIL *
+                EMAIL ADDRESS *
               </label>
               <input
                 type="email"
@@ -151,7 +178,7 @@ function Signup() {
           {formData.role === 'DRIVER' && (
             <div className="auth-vehicle-section">
               <div className="auth-vehicle-title">
-                <Car size={16} /> Register Primary Vehicle (Optional)
+                <Car size={16} color="var(--primary-teal)" /> Register Primary Vehicle (Optional)
               </div>
               
               <div className="auth-vehicle-grid-2">
@@ -190,7 +217,7 @@ function Signup() {
                 <input
                   type="text"
                   name="brand"
-                  placeholder="Brand (e.g. Tesla)"
+                  placeholder="Brand (e.g. Porsche)"
                   className="input-field"
                   style={{ fontSize: '0.85rem' }}
                   value={formData.brand}
@@ -199,7 +226,7 @@ function Signup() {
                 <input
                   type="text"
                   name="model"
-                  placeholder="Model (e.g. Model S)"
+                  placeholder="Model (e.g. Taycan)"
                   className="input-field"
                   style={{ fontSize: '0.85rem' }}
                   value={formData.model}
@@ -209,12 +236,34 @@ function Signup() {
             </div>
           )}
 
+          {formData.role === 'OWNER' && (
+            <div className="auth-vehicle-section">
+              <div className="auth-vehicle-title">
+                <Building2 size={16} color="var(--primary-teal)" /> Parking Garage Ownership Account
+              </div>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                Owner accounts allow you to list parking locations, manage hourly slots, set approval rules, and monitor real-time earnings.
+              </p>
+            </div>
+          )}
+
+          {formData.role === 'ADMIN' && (
+            <div className="auth-vehicle-section">
+              <div className="auth-vehicle-title">
+                <ShieldCheck size={16} color="var(--accent-indigo)" /> System Administrator Access
+              </div>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                Admin privileges include verifying parking locations, managing user bans, resolving dispute tickets, and system settings.
+              </p>
+            </div>
+          )}
+
           <button
             type="submit"
             className="btn btn-primary auth-submit-btn"
             disabled={loading}
           >
-            {loading ? 'Creating Account...' : 'Complete Registration'}
+            {loading ? 'Creating Account...' : `Register as ${formData.role}`}
             <ArrowRight size={18} />
           </button>
         </form>

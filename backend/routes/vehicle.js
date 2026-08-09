@@ -16,9 +16,10 @@ router.get('/user/:userId', vehicleController.getVehiclesByUser);
 router.get('/:id', vehicleController.getVehicleById);
 
 // Update Vehicle
-// router.patch("/:id", vehicleController.updateVehicle);
+router.patch("/:id", vehicleController.updateVehicle);
+router.put("/:id", vehicleController.updateVehicle);
 
 // Delete Vehicle
-router.delete("/:id", vehicleController.deleteVehicle); // not working properly     "error": "update or delete on table \"vehicles\" violates foreign key constraint \"fk_booking_vehicle\" on table \"bookings\""
+router.delete("/:id", vehicleController.deleteVehicle);
 
 module.exports = router;

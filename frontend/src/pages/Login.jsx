@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Lock, Mail, User, ShieldCheck, ArrowRight, Eye, EyeOff, Sparkles } from 'lucide-react';
+import { Lock, Mail, User, ShieldCheck, Building2, ArrowRight, Eye, EyeOff, Sparkles, Globe } from 'lucide-react';
 import './Auth.css';
 
 function Login() {
@@ -13,6 +13,15 @@ function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isAdminDomain, setIsAdminDomain] = useState(false);
+
+  useEffect(() => {
+    const hostname = window.location.hostname;
+    if (hostname.startsWith('admin.') || hostname === 'admin.localhost') {
+      setIsAdminDomain(true);
+      setSelectedRole('ADMIN');
+    }
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -27,6 +36,8 @@ function Login() {
     if (res.success) {
       if (res.user.role === 'ADMIN') {
         navigate('/admin');
+      } else if (res.user.role === 'OWNER') {
+        navigate('/owner');
       } else {
         navigate('/');
       }
@@ -42,6 +53,12 @@ function Login() {
       setSelectedRole('ADMIN');
       login('admin.system@parkx.io', 'admin123', 'ADMIN');
       navigate('/admin');
+    } else if (role === 'OWNER') {
+      setEmail('david.owner@parkx.io');
+      setPassword('owner123');
+      setSelectedRole('OWNER');
+      login('david.owner@parkx.io', 'owner123', 'OWNER');
+      navigate('/owner');
     } else {
       setEmail('alex.driver@parkx.io');
       setPassword('driver123');
@@ -62,32 +79,48 @@ function Login() {
           </div>
           <h2 className="auth-title">Sign In to PARK-X</h2>
           <p className="auth-subtitle">
-            Access real-time parking reservations & smart slot telemetry
+            Smart Parking Management & Real-time Slot Telemetry Platform
           </p>
+
+          <div className="auth-endpoint-notice">
+            <Globe size={13} color="var(--primary-teal)" />
+            <span>
+              {isAdminDomain 
+                ? 'Active Host: admin.localhost (Admin Subdomain)' 
+                : 'Standard Host: localhost (Driver & Owner Portal)'}
+            </span>
+          </div>
         </div>
 
-        {/* Role Toggle Switch */}
-        <div className="auth-role-toggle">
+        {/* 3-Role Selection Switcher */}
+        <div className="auth-role-toggle 3-roles">
           <button
             type="button"
             onClick={() => setSelectedRole('DRIVER')}
             className={`auth-role-btn ${selectedRole === 'DRIVER' ? 'active' : ''}`}
           >
-            <User size={15} /> Driver Account
+            <User size={14} /> Driver
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedRole('OWNER')}
+            className={`auth-role-btn ${selectedRole === 'OWNER' ? 'active' : ''}`}
+          >
+            <Building2 size={14} /> Owner
           </button>
           <button
             type="button"
             onClick={() => setSelectedRole('ADMIN')}
             className={`auth-role-btn ${selectedRole === 'ADMIN' ? 'active' : ''}`}
           >
-            <ShieldCheck size={15} /> Admin Portal
+            <ShieldCheck size={14} /> Admin
           </button>
         </div>
 
-        {/* Quick Demo Access Bar */}
+        {/* Quick Demo Access Buttons */}
         <div className="auth-quick-demo-box">
           <div className="auth-quick-demo-header">
-            <Sparkles size={14} color="#ffffff" /> QUICK DEMO ACCESS:
+            <Sparkles size={14} color="var(--primary-teal)" /> ONE-CLICK DEMO ACCESS:
           </div>
           <div className="auth-quick-demo-btns">
             <button 
@@ -96,6 +129,13 @@ function Login() {
               onClick={() => handleDemoLogin('DRIVER')}
             >
               Demo Driver
+            </button>
+            <button 
+              type="button"
+              className="btn btn-secondary btn-sm auth-quick-demo-btn"
+              onClick={() => handleDemoLogin('OWNER')}
+            >
+              Demo Owner
             </button>
             <button 
               type="button"

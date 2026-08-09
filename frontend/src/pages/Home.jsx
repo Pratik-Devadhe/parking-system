@@ -10,12 +10,10 @@ import {
   Clock, 
   Zap, 
   Filter, 
-  ArrowRight, 
-  CheckCircle,
-  Navigation,
   Sparkles,
   Layers,
-  CalendarCheck
+  CalendarCheck,
+  Calendar
 } from 'lucide-react';
 import './Home.css';
 
@@ -24,31 +22,48 @@ function Home() {
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // Search & Filters
+  // Advanced Search & Filter State (Satisfying Driver Features Requirements)
   const [searchQuery, setSearchQuery] = useState('');
   const [vehicleFilter, setVehicleFilter] = useState('ALL');
-  const [selectedLocation, setSelectedLocation] = useState(null);
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
+
   const [selectedSlotForBooking, setSelectedSlotForBooking] = useState(null);
   const [bookingModalLocation, setBookingModalLocation] = useState(null);
 
+  const loadData = async () => {
+    setLoading(true);
+    const data = await apiService.getLocations();
+    setLocations(data || []);
+    setLoading(false);
+  };
+
   useEffect(() => {
-    async function loadData() {
-      setLoading(true);
-      const data = await apiService.getLocations();
-      setLocations(data);
-      setLoading(false);
-    }
     loadData();
   }, []);
 
+  const handleSearchSubmit = async (e) => {
+    if (e) e.preventDefault();
+    setLoading(true);
+    const filters = {
+      query: searchQuery,
+      vehicle_type: vehicleFilter !== 'ALL' ? vehicleFilter : undefined,
+      start_time: startTime || undefined,
+      end_time: endTime || undefined
+    };
+    const results = await apiService.searchLocations(filters);
+    setLocations(results || []);
+    setLoading(false);
+  };
+
   const filteredLocations = locations.filter(loc => {
-    const matchesSearch = loc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    const matchesSearch = !searchQuery ||
+                          loc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           loc.address.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesSearch;
   });
 
   const handleOpenSlotModal = async (loc) => {
-    setSelectedLocation(loc);
     const slots = await apiService.getSlotsByLocation(loc.id);
     const availableSlot = slots.find(s => s.status === 'AVAILABLE') || slots[0];
     if (availableSlot) {
@@ -69,30 +84,73 @@ function Home() {
           </div>
 
           <h1 className="home-hero-title">
-            Next-Gen Parking. <br />
-            <span className="home-hero-subtitle-muted">Guaranteed Spot in Seconds.</span>
+            Find & Reserve Parking Nearby. <br />
+            <span className="home-hero-subtitle-muted">Search by location, date, time & vehicle type.</span>
           </h1>
 
           <p className="home-hero-desc">
-            Real-time ultrasonic slot monitoring, automated gate barriers, and instant booking for high-end luxury garages and city hubs.
+            Real-time ultrasonic slot monitoring, automated gate barriers, and advance reservations for 2-wheelers and 4-wheelers.
           </p>
 
-          {/* HERO SEARCH BAR */}
-          <div className="home-hero-search-box">
-            <div className="home-hero-search-input-wrapper">
-              <Search size={20} color="var(--text-subtle)" />
-              <input
-                type="text"
-                placeholder="Search location, address, or city (e.g. Financial District)..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="home-hero-search-input"
-              />
+          {/* DRIVER MULTI-FILTER SEARCH BAR */}
+          <form className="home-hero-search-box glass-card" onSubmit={handleSearchSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+              {/* Location Input */}
+              <div className="home-hero-search-input-wrapper">
+                <MapPin size={18} color="var(--text-subtle)" />
+                <input
+                  type="text"
+                  placeholder="Location or address..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="home-hero-search-input"
+                />
+              </div>
+
+              {/* Start Time */}
+              <div className="home-hero-search-input-wrapper">
+                <Calendar size={18} color="var(--text-subtle)" />
+                <input
+                  type="datetime-local"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  className="home-hero-search-input"
+                />
+              </div>
+
+              {/* End Time */}
+              <div className="home-hero-search-input-wrapper">
+                <Clock size={18} color="var(--text-subtle)" />
+                <input
+                  type="datetime-local"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  className="home-hero-search-input"
+                />
+              </div>
+
+              {/* Vehicle Type Toggle */}
+              <div className="home-hero-search-input-wrapper">
+                <Car size={18} color="var(--text-subtle)" />
+                <select
+                  value={vehicleFilter}
+                  onChange={(e) => setVehicleFilter(e.target.value)}
+                  className="home-hero-search-input"
+                  style={{ background: 'transparent', color: '#fff', cursor: 'pointer' }}
+                >
+                  <option value="ALL" style={{ background: '#000' }}>All Vehicles</option>
+                  <option value="FOUR_WHEELER" style={{ background: '#000' }}>4-Wheeler (Car/SUV)</option>
+                  <option value="TWO_WHEELER" style={{ background: '#000' }}>2-Wheeler (Bike/Scooter)</option>
+                </select>
+              </div>
             </div>
-            <button className="btn btn-primary btn-lg home-hero-search-btn">
-              Explore Hubs
-            </button>
-          </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button type="submit" className="btn btn-primary btn-lg home-hero-search-btn">
+                <Search size={18} /> Search Available Slots
+              </button>
+            </div>
+          </form>
         </div>
       </div>
 
@@ -104,7 +162,7 @@ function Home() {
           </div>
           <div>
             <div className="home-metric-val">{locations.length} Active Hubs</div>
-            <div className="home-metric-label">Verified City Facilities</div>
+            <div className="home-metric-label">Verified Facilities</div>
           </div>
         </div>
 
@@ -144,7 +202,7 @@ function Home() {
         <div>
           <h2 className="home-locations-title">Available Parking Locations</h2>
           <p className="home-locations-sub">
-            Select a location to inspect interactive slot maps & prices
+            Select a location to inspect slot compatibility, operating hours & reserve in advance
           </p>
         </div>
 
@@ -174,7 +232,7 @@ function Home() {
       {/* LOCATIONS GRID */}
       {loading ? (
         <div className="home-state-message">
-          Loading parking network data...
+          Searching parking network data...
         </div>
       ) : filteredLocations.length === 0 ? (
         <div className="glass-card home-state-message">
@@ -185,6 +243,10 @@ function Home() {
           {filteredLocations.map((loc) => (
             <div key={loc.id} className="glass-card home-location-card">
               <div>
+                {loc.primary_image && (
+                  <img src={loc.primary_image} alt={loc.name} style={{ width: '100%', height: '160px', objectFit: 'cover', borderRadius: 'var(--radius-sm)', marginBottom: '14px' }} />
+                )}
+
                 <div className="home-location-card-top">
                   <div>
                     <h3 className="home-location-card-name">
@@ -215,7 +277,13 @@ function Home() {
                   <div>
                     <div className="home-location-info-lbl">APPROVAL MODE</div>
                     <div className="home-location-info-val auto-mode">
-                      {loc.approval_mode === 'AUTO' ? '⚡ Instant Auto' : '📝 Manual'}
+                      {loc.approval_mode === 'AUTO' ? '⚡ Instant Auto' : '📝 Manual Review'}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="home-location-info-lbl">HOURS</div>
+                    <div className="home-location-info-val">
+                      {loc.operating_hours_start?.slice(0, 5)} - {loc.operating_hours_end?.slice(0, 5)}
                     </div>
                   </div>
                 </div>
@@ -227,14 +295,14 @@ function Home() {
                   className="btn btn-secondary home-location-action-btn" 
                   onClick={() => navigate(`/location/${loc.id}`)}
                 >
-                  <Layers size={16} /> View Slot Grid
+                  <Layers size={16} /> View Details & Map
                 </button>
 
                 <button 
                   className="btn btn-primary home-location-action-btn" 
                   onClick={() => handleOpenSlotModal(loc)}
                 >
-                  <CalendarCheck size={16} /> Book Now
+                  <CalendarCheck size={16} /> Reserve Spot
                 </button>
               </div>
             </div>
@@ -245,7 +313,7 @@ function Home() {
       {/* HOW IT WORKS PROCESS SECTION */}
       <div className="glass-card home-process-container">
         <div className="home-process-header">
-          <span className="badge badge-dark" style={{ marginBottom: '10px' }}>SEAMLESS WORKFLOW</span>
+          <span className="badge badge-dark" style={{ marginBottom: '10px' }}>SEAMLESS DRIVER WORKFLOW</span>
           <h2 className="home-process-title">How PARK-X Works</h2>
           <p className="home-process-sub">
             Book your parking spot in 4 quick steps before you even leave home
@@ -255,26 +323,26 @@ function Home() {
         <div className="home-process-grid">
           <div className="home-process-step">
             <div className="home-process-step-num">1</div>
-            <h4 className="home-process-step-title">Locate Facility</h4>
-            <p className="home-process-step-desc">Search by address or nearby landmark on our live interactive network map.</p>
+            <h4 className="home-process-step-title">Search & Filter</h4>
+            <p className="home-process-step-desc">Filter nearby parking by location, arrival date/time & vehicle type (2W or 4W).</p>
           </div>
 
           <div className="home-process-step">
             <div className="home-process-step-num">2</div>
-            <h4 className="home-process-step-title">Select Slot</h4>
-            <p className="home-process-step-desc">Choose exact slot number (Two-wheeler or Four-wheeler) with hourly price locks.</p>
+            <h4 className="home-process-step-title">Select & Inspect</h4>
+            <p className="home-process-step-desc">View slot dimensions, map location, hourly rates and availability window.</p>
           </div>
 
           <div className="home-process-step">
             <div className="home-process-step-num">3</div>
-            <h4 className="home-process-step-title">Reserve & Pay</h4>
-            <p className="home-process-step-desc">Complete checkout via Card, Apple Pay or UPI to generate your digital entry pass.</p>
+            <h4 className="home-process-step-title">Reserve in Advance</h4>
+            <p className="home-process-step-desc">Lock your time window in advance. Get instant confirmation and notification.</p>
           </div>
 
           <div className="home-process-step">
             <div className="home-process-step-num">4</div>
             <h4 className="home-process-step-title">Scan & Park</h4>
-            <p className="home-process-step-desc">Automated barrier recognizes license plate or QR pass to grant entry in &lt;15 seconds.</p>
+            <p className="home-process-step-desc">Automated gate barrier grants entry in seconds upon check-in.</p>
           </div>
         </div>
       </div>

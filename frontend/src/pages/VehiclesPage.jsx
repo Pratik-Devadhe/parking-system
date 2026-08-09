@@ -5,6 +5,7 @@ import { Car, Plus, Trash2, ShieldCheck, X } from 'lucide-react';
 import './VehiclesPage.css';
 
 function VehiclesPage() {
+
   const { user } = useAuth();
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -38,13 +39,17 @@ function VehiclesPage() {
       user_id: user ? user.id : 1
     };
 
-    const res = await apiService.addVehicle(payload);
+    const res = await apiService.createVehicle(payload);
+
+    console.log(res);
+
     if (res) {
       setShowAddModal(false);
-      setNewVehicle({ vehicle_number: 'kk-jj-8510', vehicle_type: 'FOUR_WHEELER', brand: 'BMW', model: 'M4' });
+      setNewVehicle({ vehicle_number: 'kk-jj-8510', vehicle_type: 'FOUR_WHEELER', brand: 'BMW', model: 'M4' }); // reset the form
       fetchVehicles();
     } else {
       alert('Failed to register vehicle.');
+      console.log("error");
     }
   };
 
@@ -132,10 +137,10 @@ function VehiclesPage() {
               </button>
             </div>
 
-            <form onSubmit={handleAddVehicle} className="vehicle-form">
+            <form onSubmit={ handleAddVehicle } className="vehicle-form">
               <div>
                 <label className="booking-field-label">
-                  LICENSE PLATE NUMBER *``
+                  LICENSE PLATE NUMBER *
                 </label>
                 <input
                   type="text"

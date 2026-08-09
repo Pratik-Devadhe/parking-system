@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
+import { apiService } from '../../services/api';
 import { 
   Car, 
   MapPin, 
@@ -9,75 +11,233 @@ import {
   LogOut, 
   LogIn, 
   UserPlus, 
-  Activity, 
   Repeat,
-  User
+  Building2,
+  Bell,
+  Check,
+  Globe,
+  Sun,
+  Moon,
+  ChevronDown
 } from 'lucide-react';
 import './Header.css';
 
 function Header() {
   const { user, role, logout, switchRole } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [showRoleDropdown, setShowRoleDropdown] = useState(false);
+  const [isAdminSubdomain, setIsAdminSubdomain] = useState(false);
+
+  const userId = user?.id || 1;
+
+  useEffect(() => {
+    const hostname = window.location.hostname;
+    if (hostname.startsWith('admin.') || hostname === 'admin.localhost') {
+      setIsAdminSubdomain(true);
+    } else {
+      setIsAdminSubdomain(false);
+    }
+  }, []);
+
+  const loadNotifications = async () => {
+    if (user) {
+      const data = await apiService.getNotifications(userId);
+      setNotifications(data || []);
+    }
+  };
+
+  useEffect(() => {
+    loadNotifications();
+    const interval = setInterval(loadNotifications, 10000);
+    return () => clearInterval(interval);
+  }, [user, userId]);
+
+  const unreadCount = notifications.filter(n => !n.is_read).length;
+
+  const handleMarkAsRead = async (id) => {
+    await apiService.markNotificationRead(id);
+    loadNotifications();
+  };
+
+  const handleMarkAllRead = async () => {
+    await apiService.markAllNotificationsRead(userId);
+    loadNotifications();
+  };
+
+  const handleRoleSelect = (targetRole) => {
+    switchRole(targetRole);
+    setShowRoleDropdown(false);
+    if (targetRole === 'ADMIN') {
+      navigate('/admin');
+    } else if (targetRole === 'OWNER') {
+      navigate('/owner');
+    } else {
+      navigate('/');
+    }
+  };
 
   const isActive = (path) => location.pathname === path;
 
   return (
     <header className="header-container">
-      <Link to="/" className="header-brand">
-        <div className="brand-icon">P</div>
-        <div className="brand-text">
-          PARK<span className="brand-accent">X</span>
+      <div className="header-brand-group">
+        <Link to="/" className="header-brand">
+          <div className="brand-icon">P</div>
+          <div className="brand-text">
+            PARK<span className="brand-accent">X</span>
+          </div>
+        </Link>
+
+        {/* DOMAIN INDICATOR */}
+        <div className={`subdomain-tag ${isAdminSubdomain ? 'admin-domain' : 'normal-domain'}`} title="Current Host Domain">
+          <Globe size={13} />
+          <span>{isAdminSubdomain ? 'admin.localhost' : 'localhost'}</span>
         </div>
-      </Link>
+      </div>
 
       <nav className="header-nav">
         <Link to="/" className={`nav-link ${isActive('/') ? 'active' : ''}`}>
           <MapPin size={16} />
-          Locations
+          <span>Find Parking</span>
         </Link>
 
         {user && (
           <>
             <Link to="/bookings" className={`nav-link ${isActive('/bookings') ? 'active' : ''}`}>
               <CalendarCheck size={16} />
-              My Bookings
+              <span>My Bookings</span>
             </Link>
 
             <Link to="/vehicles" className={`nav-link ${isActive('/vehicles') ? 'active' : ''}`}>
               <Car size={16} />
-              My Vehicles
+              <span>My Vehicles</span>
             </Link>
           </>
         )}
 
-        {role === 'ADMIN' && (
-          <Link to="/admin" className={`nav-link admin-nav-link ${isActive('/admin') ? 'active' : ''}`}>
-            <ShieldCheck size={16} />
-            Admin Portal
-          </Link>
-        )}
+        <Link to="/owner" className={`nav-link owner-nav-link ${isActive('/owner') ? 'active' : ''}`}>
+          <Building2 size={16} />
+          <span>Owner Portal</span>
+        </Link>
+
+        <Link to="/admin" className={`nav-link admin-nav-link ${isActive('/admin') ? 'active' : ''}`}>
+          <ShieldCheck size={16} />
+          <span>Admin Portal</span>
+        </Link>
       </nav>
 
       <div className="header-user-section">
+        {/* THEME TOGGLE BUTTON */}
+        <button 
+          className="theme-toggle-btn"
+          onClick={toggleTheme}
+          title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Theme`}
+          aria-label="Toggle Theme"
+        >
+          {theme === 'dark' ? <Sun size={18} className="theme-icon sun" /> : <Moon size={18} className="theme-icon moon" />}
+        </button>
+
         {user ? (
           <>
-            <button 
-              className="btn btn-secondary btn-sm"
-              title="Toggle role space for testing"
-              onClick={() => switchRole(role === 'ADMIN' ? 'DRIVER' : 'ADMIN')}
-            >
-              <Repeat size={14} />
-              {role === 'ADMIN' ? 'Driver View' : 'Admin Space'}
-            </button>
+            {/* ROLE SWITCHER DROPDOWN */}
+            <div className="role-switch-wrapper" style={{ position: 'relative' }}>
+              <button 
+                className="role-switch-btn"
+                title="Switch Portal Role View"
+                onClick={() => setShowRoleDropdown(!showRoleDropdown)}
+              >
+                <Repeat size={14} />
+                <span>Role: <strong>{role}</strong></span>
+                <ChevronDown size={12} />
+              </button>
 
+              {showRoleDropdown && (
+                <div className="role-dropdown-menu glass-card">
+                  <div className="role-dropdown-header">Switch Portal Access</div>
+                  <button 
+                    className={`role-dropdown-item ${role === 'DRIVER' ? 'active' : ''}`}
+                    onClick={() => handleRoleSelect('DRIVER')}
+                  >
+                    <Car size={15} /> Driver (Customer)
+                  </button>
+                  <button 
+                    className={`role-dropdown-item ${role === 'OWNER' ? 'active' : ''}`}
+                    onClick={() => handleRoleSelect('OWNER')}
+                  >
+                    <Building2 size={15} /> Space Owner (Host)
+                  </button>
+                  <button 
+                    className={`role-dropdown-item ${role === 'ADMIN' ? 'active' : ''}`}
+                    onClick={() => handleRoleSelect('ADMIN')}
+                  >
+                    <ShieldCheck size={15} /> Platform Admin
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* NOTIFICATION BELL ICON */}
+            <div style={{ position: 'relative' }}>
+              <button 
+                className="notification-bell-btn"
+                onClick={() => setShowNotifications(!showNotifications)}
+                title="Notifications"
+              >
+                <Bell size={18} />
+                {unreadCount > 0 && <span className="notification-badge-count">{unreadCount}</span>}
+              </button>
+
+              {/* NOTIFICATION DROPDOWN DRAWER */}
+              {showNotifications && (
+                <div className="notifications-dropdown glass-card">
+                  <div className="notif-header">
+                    <span style={{ fontWeight: '800' }}>Notifications</span>
+                    {unreadCount > 0 && (
+                      <button className="mark-all-read-btn" onClick={handleMarkAllRead}>
+                        Mark all read
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="notif-list">
+                    {notifications.length === 0 ? (
+                      <div className="notif-empty">No notifications yet</div>
+                    ) : (
+                      notifications.map(n => (
+                        <div key={n.id} className={`notif-item ${!n.is_read ? 'unread' : ''}`}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                            <strong style={{ fontSize: '0.85rem' }}>{n.title}</strong>
+                            {!n.is_read && (
+                              <button className="read-dot-btn" onClick={() => handleMarkAsRead(n.id)}>
+                                <Check size={12} />
+                              </button>
+                            )}
+                          </div>
+                          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>{n.message}</p>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-subtle)', marginTop: '4px', display: 'block' }}>
+                            {new Date(n.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* USER PROFILE BADGE */}
             <div className="user-profile-badge">
               <div className="user-avatar">
                 {user.full_name ? user.full_name[0].toUpperCase() : 'U'}
               </div>
               <div className="user-info">
-                <span className="user-name">{user.full_name || 'Driver'}</span>
-                <span className="user-role-label">{role}</span>
+                <span className="user-name">{user.full_name || 'User'}</span>
+                <span className="user-role-label">{role} PORTAL</span>
               </div>
             </div>
 
