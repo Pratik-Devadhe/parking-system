@@ -1,7 +1,7 @@
 // Centralized API Service for PARK-X Smart Parking System
 // Synchronized with Backend Routes: /user, /location, /slot, /vehicle, /booking, /sessions, /notification, /dispute, /setting
 
-const BASE_URL = 'http://localhost:8080';
+const BASE_URL = import.meta.env.VITE_API_URL;
 
 // Fallback Mock Datasets
 let mockLocations = [
