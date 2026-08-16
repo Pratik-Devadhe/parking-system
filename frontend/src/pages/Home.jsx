@@ -93,65 +93,107 @@ function Home() {
           </p>
 
           {/* DRIVER MULTI-FILTER SEARCH BAR */}
-          <form className="home-hero-search-box glass-card" onSubmit={handleSearchSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '20px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-              {/* Location Input */}
-              <div className="home-hero-search-input-wrapper">
-                <MapPin size={18} color="var(--text-subtle)" />
-                <input
-                  type="text"
-                  placeholder="Location or address..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="home-hero-search-input"
-                />
-              </div>
+<form
+  className="home-search-form"
+  onSubmit={handleSearchSubmit}
+>
+  <div className="home-search-header">
+    <div>
+      <h3>Find a Parking Slot</h3>
+      <p>Search available parking based on your location and time.</p>
+    </div>
+  </div>
 
-              {/* Start Time */}
-              <div className="home-hero-search-input-wrapper">
-                <Calendar size={18} color="var(--text-subtle)" />
-                <input
-                  type="datetime-local"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  className="home-hero-search-input"
-                />
-              </div>
+  <div className="home-search-fields">
 
-              {/* End Time */}
-              <div className="home-hero-search-input-wrapper">
-                <Clock size={18} color="var(--text-subtle)" />
-                <input
-                  type="datetime-local"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  className="home-hero-search-input"
-                />
-              </div>
+    {/* Location */}
+    <div className="home-search-field location-field">
+      <label>Location</label>
 
-              {/* Vehicle Type Toggle */}
-              <div className="home-hero-search-input-wrapper">
-                <Car size={18} color="var(--text-subtle)" />
-                <select
-                  value={vehicleFilter}
-                  onChange={(e) => setVehicleFilter(e.target.value)}
-                  className="home-hero-search-input"
-                  style={{ background: 'transparent', color: '#fff', cursor: 'pointer' }}
-                >
-                  <option value="ALL" style={{ background: '#000' }}>All Vehicles</option>
-                  <option value="FOUR_WHEELER" style={{ background: '#000' }}>4-Wheeler (Car/SUV)</option>
-                  <option value="TWO_WHEELER" style={{ background: '#000' }}>2-Wheeler (Bike/Scooter)</option>
-                </select>
-              </div>
-            </div>
+      <div className="home-search-input-wrapper">
+        <MapPin size={19} />
+        <input
+          type="text"
+          placeholder="Enter location or address"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+      </div>
+    </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button type="submit" className="btn btn-primary btn-lg home-hero-search-btn">
-                <Search size={18} /> Search Available Slots
-              </button>
-            </div>
-          </form>
+    {/* Start Time */}
+    <div className="home-search-field">
+      <label>Start Time</label>
+
+      <div className="home-search-input-wrapper">
+        <Calendar size={19} />
+
+        <input
+          type="datetime-local"
+          value={startTime}
+          onChange={(e) => setStartTime(e.target.value)}
+        />
+      </div>
+    </div>
+
+    {/* End Time */}
+    <div className="home-search-field">
+      <label>End Time</label>
+
+      <div className="home-search-input-wrapper">
+        <Clock size={19} />
+
+        <input
+          type="datetime-local"
+          value={endTime}
+          onChange={(e) => setEndTime(e.target.value)}
+        />
+      </div>
+    </div>
+
+    {/* Vehicle */}
+    <div className="home-search-field">
+      <label>Vehicle Type</label>
+
+      <div className="home-search-input-wrapper">
+        <Car size={19} />
+
+        <select
+          value={vehicleFilter}
+          onChange={(e) => setVehicleFilter(e.target.value)}
+        >
+          <option value="ALL">All Vehicles</option>
+          <option value="FOUR_WHEELER">
+            4-Wheeler (Car/SUV)
+          </option>
+          <option value="TWO_WHEELER">
+            2-Wheeler (Bike/Scooter)
+          </option>
+        </select>
+      </div>
+    </div>
+
+  </div>
+
+  {/* Search Button */}
+  <div className="home-search-footer">
+    <span className="home-search-hint">
+      Find the best available parking near you
+    </span>
+
+    <button
+      type="submit"
+      className="home-search-button"
+    >
+      <Search size={19} />
+      Search Available Slots
+    </button>
+  </div>
+</form>
         </div>
+
+        
+
       </div>
 
       {/* METRICS BANNER */}
@@ -241,6 +283,7 @@ function Home() {
       ) : (
         <div className="home-locations-grid">
           {filteredLocations.map((loc) => (
+            
             <div key={loc.id} className="glass-card home-location-card">
               <div>
                 {loc.primary_image && (

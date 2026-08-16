@@ -15,6 +15,21 @@ module.exports.getAllLocation = async (req, res) => {
     }
 };
 
+module.exports.getLocationById = async (req , res ) =>{
+    try{
+
+        const {id} = req.params;
+
+        const data = await pool.query(`SELECT * FROM parking_locations WHERE id = $1` , [id]);
+
+        res.json(data.rows[0]);
+
+    }catch(err){
+        res.send(`erroe : ${err}`);
+    }
+}
+
+
 module.exports.getLocationsByOwner = async (req, res) => {
     const { ownerId } = req.params;
     try {

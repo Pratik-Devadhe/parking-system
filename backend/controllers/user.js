@@ -1,4 +1,5 @@
 const pool = require('../db.js');
+const { generateToken } = require('../middleware/auth.js');
 
 module.exports.getAllUsers = async (req, res) => {
     try {
@@ -18,7 +19,9 @@ module.exports.createUser = async (req, res) => {
              VALUES ($1, $2, $3, $4, $5, COALESCE($6, FALSE)) RETURNING id, full_name, email, phone, role, is_verified, status, created_at`,
             [full_name, email, phone, password, role || 'DRIVER', is_verified]
         );
-        res.status(201).json(result.rows[0]);
+        const user = result.rows[0];
+        const token = generateToken(user);
+        res.status(201).json({ message: 'User registered successfully', token, user });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -47,8 +50,10 @@ module.exports.loginUser = async (req, res) => {
         }
 
         delete user.password;
+        const token = generateToken(user);
         res.json({
             message: 'Login successful',
+            token,
             user: user
         });
     } catch (err) {

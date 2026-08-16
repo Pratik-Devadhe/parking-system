@@ -12,12 +12,12 @@
 .vehicles-page-title {
   font-size: 2.2rem;
   font-weight: 900;
-  color: var(--text-main);
+  color: #ffffff;
   margin-bottom: 6px;
 }
 
 .vehicles-page-sub {
-  color: var(--text-muted);
+  color: #ffffff;
   font-size: 0.95rem;
 }
 

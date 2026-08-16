@@ -4,6 +4,7 @@ import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import Header from './components/common/Header';
 import Footer from './components/common/Footer';
+import ProtectedRoute from './components/common/ProtectedRoute';
 
 // Pages
 import Home from './pages/Home';
@@ -25,15 +26,52 @@ function App() {
 
           <main className="main-content">
             <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/location/:id" element={<LocationDetail />} />
-              <Route path="/bookings" element={<BookingsPage />} />
-              <Route path="/vehicles" element={<VehiclesPage />} />
-              <Route path="/owner" element={<OwnerDashboard />} />
-              <Route path="/admin" element={<AdminDashboard />} />
+              {/* Public Authentication Routes */}
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
-              <Route path="/users" element={<UsersPage />} />
+
+              {/* Protected Driver Mode Routes - Accessible to DRIVER, OWNER, ADMIN */}
+              <Route path="/" element={
+                <ProtectedRoute allowedRoles={['DRIVER', 'OWNER', 'ADMIN']}>
+                  <Home />
+                </ProtectedRoute>
+              } />
+              <Route path="/location/:id" element={
+                <ProtectedRoute allowedRoles={['DRIVER', 'OWNER', 'ADMIN']}>
+                  <LocationDetail />
+                </ProtectedRoute>
+              } />
+              <Route path="/bookings" element={
+                <ProtectedRoute allowedRoles={['DRIVER', 'OWNER', 'ADMIN']}>
+                  <BookingsPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/vehicles" element={
+                <ProtectedRoute allowedRoles={['DRIVER', 'OWNER', 'ADMIN']}>
+                  <VehiclesPage />
+                </ProtectedRoute>
+              } />
+
+              {/* Protected Owner Mode Routes - Accessible to OWNER and ADMIN */}
+              <Route path="/owner" element={
+                <ProtectedRoute allowedRoles={['OWNER', 'ADMIN']}>
+                  <OwnerDashboard />
+                </ProtectedRoute>
+              } />
+
+              {/* Protected Admin Portal Routes - ONLY Accessible to ADMIN */}
+              <Route path="/admin" element={
+                <ProtectedRoute allowedRoles={['ADMIN']}>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/users" element={
+                <ProtectedRoute allowedRoles={['ADMIN']}>
+                  <UsersPage />
+                </ProtectedRoute>
+              } />
+
+              {/* Fallback Redirect */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </main>
@@ -46,3 +84,4 @@ function App() {
 }
 
 export default App;
+

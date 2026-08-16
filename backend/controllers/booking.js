@@ -209,15 +209,21 @@ module.exports.approveBooking = async (req, res) => {
         const { id } = req.params;
         await client.query("BEGIN");
 
+        const checkRes = await client.query(`SELECT * FROM bookings WHERE id = $1 FOR UPDATE`, [id]);
+        if (checkRes.rows.length === 0) {
+            await client.query("ROLLBACK");
+            return res.status(404).json({ message: "Booking not found" });
+        }
+        
+        if (checkRes.rows[0].booking_status !== 'PENDING') {
+            await client.query("ROLLBACK");
+            return res.status(400).json({ message: "Only PENDING bookings can be approved" });
+        }
+
         const result = await client.query(
             `UPDATE bookings SET booking_status = 'CONFIRMED', updated_at = NOW() WHERE id = $1 RETURNING *`,
             [id]
         );
-
-        if (result.rows.length === 0) {
-            await client.query("ROLLBACK");
-            return res.status(404).json({ message: "Booking not found" });
-        }
 
         const b = result.rows[0];
         await client.query(`UPDATE parking_slots SET status = 'RESERVED' WHERE id = $1`, [b.slot_id]);
@@ -241,18 +247,30 @@ module.exports.approveBooking = async (req, res) => {
 };
 
 module.exports.rejectBooking = async (req, res) => {
+    const client = await pool.connect();
     try {
         const { id } = req.params;
-        const result = await pool.query(
+        await client.query("BEGIN");
+
+        const checkRes = await client.query(`SELECT * FROM bookings WHERE id = $1 FOR UPDATE`, [id]);
+        if (checkRes.rows.length === 0) {
+            await client.query("ROLLBACK");
+            return res.status(404).json({ message: "Booking not found" });
+        }
+        
+        if (checkRes.rows[0].booking_status !== 'PENDING') {
+            await client.query("ROLLBACK");
+            return res.status(400).json({ message: "Only PENDING bookings can be declined" });
+        }
+
+        const result = await client.query(
             `UPDATE bookings SET booking_status = 'CANCELLED', cancelled_at = NOW(), updated_at = NOW() WHERE id = $1 RETURNING *`,
             [id]
         );
 
-        if (result.rows.length === 0) {
-            return res.status(404).json({ message: "Booking not found" });
-        }
-
         const b = result.rows[0];
+        await client.query("COMMIT");
+
         await createNotificationHelper(
             b.user_id,
             'Booking Request Declined',
@@ -262,7 +280,10 @@ module.exports.rejectBooking = async (req, res) => {
 
         res.json({ message: "Booking request declined", booking: b });
     } catch (err) {
+        await client.query("ROLLBACK");
         res.status(500).json({ error: err.message });
+    } finally {
+        client.release();
     }
 };
 
@@ -351,16 +372,21 @@ module.exports.cancelBooking = async (req, res) => {
         const { cancelled_by } = req.body;
 
         await client.query("BEGIN");
+        
+        const checkRes = await client.query(`SELECT * FROM bookings WHERE id = $1 FOR UPDATE`, [id]);
+        if (checkRes.rows.length === 0) {
+            await client.query("ROLLBACK");
+            return res.status(404).json({ message: "Booking not found" });
+        }
+        if (['CANCELLED', 'COMPLETED', 'ACTIVE'].includes(checkRes.rows[0].booking_status)) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({ message: `Cannot cancel a booking that is currently ${checkRes.rows[0].booking_status}` });
+        }
 
         const booking = await client.query(
             `UPDATE bookings SET booking_status = 'CANCELLED', cancelled_at = NOW(), cancelled_by = $1 WHERE id = $2 RETURNING *`,
             [cancelled_by || 1, id]
         );
-
-        if (booking.rows.length === 0) {
-            await client.query("ROLLBACK");
-            return res.status(404).json({ message: "Booking not found" });
-        }
 
         await client.query(`UPDATE parking_slots SET status = 'AVAILABLE' WHERE id = $1`, [booking.rows[0].slot_id]);
 
@@ -381,7 +407,7 @@ module.exports.checkIn = async (req, res) => {
         const { id } = req.params;
         await client.query("BEGIN");
 
-        const bookingResult = await client.query(`SELECT * FROM bookings WHERE id = $1`, [id]);
+        const bookingResult = await client.query(`SELECT * FROM bookings WHERE id = $1 FOR UPDATE`, [id]);
         if (bookingResult.rows.length === 0) {
             await client.query("ROLLBACK");
             return res.status(404).json({ message: "Booking not found" });
@@ -421,25 +447,31 @@ module.exports.checkOut = async (req, res) => {
         const { id } = req.params;
         await client.query("BEGIN");
 
-        const bookingResult = await client.query(`SELECT * FROM bookings WHERE id = $1`, [id]);
+        const bookingResult = await client.query(`SELECT * FROM bookings WHERE id = $1 FOR UPDATE`, [id]);
         if (bookingResult.rows.length === 0) {
             await client.query('ROLLBACK');
             return res.status(404).json({ message: 'Booking not found' });
         }
-
+        
         const bookingRow = bookingResult.rows[0];
+        if (bookingRow.booking_status !== 'ACTIVE') {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ message: 'Booking is not active. Cannot check out.' });
+        }
+
+        const sessionCheck = await client.query(`SELECT * FROM parking_sessions WHERE booking_id = $1 AND exit_time IS NULL FOR UPDATE`, [id]);
+        if (sessionCheck.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ message: 'Parking session not found or already checked out.' });
+        }
+
         const session = await client.query(
             `UPDATE parking_sessions SET exit_time = NOW() WHERE booking_id = $1 RETURNING *`,
             [id]
         );
 
-        if (session.rows.length === 0 || !session.rows[0].entry_time) {
-            await client.query('ROLLBACK');
-            return res.status(400).json({ message: 'Parking session not found or already checked out.' });
-        }
-
         const entry = new Date(session.rows[0].entry_time);
-        const exit = new Date();
+        const exit = new Date(session.rows[0].exit_time);
         const hours = Math.max(1, Math.ceil((exit - entry) / (1000 * 60 * 60)));
 
         const slot = await client.query(`SELECT hourly_price FROM parking_slots WHERE id = $1`, [bookingRow.slot_id]);
