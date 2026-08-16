@@ -33,12 +33,12 @@ function LocationDetail() {
   const fetchLocationData = async () => {
     setLoading(true);
     const [locations, slotsData] = await Promise.all([
-      apiService.getLocations(),
+      apiService.getLocationById(id),
       apiService.getSlotsByLocation(id)
     ]);
 
-    const loc = locations.find(l => l.id === Number(id)) || locations[0];
-    setLocation(loc);
+
+    setLocation(locations);
     setSlots(slotsData || []);
     setLoading(false);
   };
@@ -77,6 +77,7 @@ function LocationDetail() {
   }
 
   return (
+
     <div className="location-detail-container">
       <button className="btn btn-secondary btn-sm location-detail-back-btn" onClick={() => navigate('/')}>
         <ArrowLeft size={16} /> Back to Hubs
@@ -94,7 +95,7 @@ function LocationDetail() {
               <h1 className="location-detail-title">{location.name}</h1>
               {location.is_verified && (
                 <span className="badge badge-dark">
-                  <ShieldCheck size={12} color="#10b981" /> Verified Facility
+                  <ShieldCheck size={12} color="#10b981" />  Verified Facility
                 </span>
               )}
             </div>
@@ -117,7 +118,7 @@ function LocationDetail() {
         <div className="location-detail-stats-strip">
           <div className="location-detail-stat-card">
             <div className="location-detail-stat-label">TOTAL CAPACITY</div>
-            <div className="location-detail-stat-val">{slots.length || location.total_slots || 30} Slots</div>
+            <div className="location-detail-stat-val">{location.total_slots || 30} Slots</div>
           </div>
 
           <div className="location-detail-stat-card">
@@ -189,6 +190,7 @@ function LocationDetail() {
       ) : (
         <div className="location-detail-slots-grid">
           {filteredSlots.map((slot) => {
+
             const isAvailable = slot.status === 'AVAILABLE';
             return (
               <div 

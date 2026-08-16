@@ -34,6 +34,7 @@ function Header() {
   const [isAdminSubdomain, setIsAdminSubdomain] = useState(false);
 
   const userId = user?.id || 1;
+  const currentRole = (user?.role || role || 'DRIVER').toUpperCase();
 
   useEffect(() => {
     const hostname = window.location.hostname;
@@ -52,9 +53,11 @@ function Header() {
   };
 
   useEffect(() => {
-    loadNotifications();
-    const interval = setInterval(loadNotifications, 10000);
-    return () => clearInterval(interval);
+    if (user) {
+      loadNotifications();
+      const interval = setInterval(loadNotifications, 10000);
+      return () => clearInterval(interval);
+    }
   }, [user, userId]);
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
@@ -70,6 +73,15 @@ function Header() {
   };
 
   const handleRoleSelect = (targetRole) => {
+    if (currentRole === 'DRIVER' && targetRole !== 'DRIVER') {
+      alert('Access Denied: Driver accounts cannot switch to Owner or Admin portal.');
+      return;
+    }
+    if (currentRole === 'OWNER' && targetRole === 'ADMIN') {
+      alert('Access Denied: Owner accounts cannot switch to Admin portal.');
+      return;
+    }
+
     switchRole(targetRole);
     setShowRoleDropdown(false);
     if (targetRole === 'ADMIN') {
@@ -86,7 +98,7 @@ function Header() {
   return (
     <header className="header-container">
       <div className="header-brand-group">
-        <Link to="/" className="header-brand">
+        <Link to={user ? "/" : "/login"} className="header-brand">
           <div className="brand-icon">P</div>
           <div className="brand-text">
             PARK<span className="brand-accent">X</span>
@@ -101,13 +113,13 @@ function Header() {
       </div>
 
       <nav className="header-nav">
-        <Link to="/" className={`nav-link ${isActive('/') ? 'active' : ''}`}>
-          <MapPin size={16} />
-          <span>Find Parking</span>
-        </Link>
-
         {user && (
           <>
+            <Link to="/" className={`nav-link ${isActive('/') ? 'active' : ''}`}>
+              <MapPin size={16} />
+              <span>Find Parking</span>
+            </Link>
+
             <Link to="/bookings" className={`nav-link ${isActive('/bookings') ? 'active' : ''}`}>
               <CalendarCheck size={16} />
               <span>My Bookings</span>
@@ -117,18 +129,24 @@ function Header() {
               <Car size={16} />
               <span>My Vehicles</span>
             </Link>
+
+            {/* OWNER PORTAL - Available to OWNER and ADMIN */}
+            {(currentRole === 'OWNER' || currentRole === 'ADMIN') && (
+              <Link to="/owner" className={`nav-link owner-nav-link ${isActive('/owner') ? 'active' : ''}`}>
+                <Building2 size={16} />
+                <span>Owner Portal</span>
+              </Link>
+            )}
+
+            {/* ADMIN PORTAL - ONLY Available to ADMIN */}
+            {currentRole === 'ADMIN' && (
+              <Link to="/admin" className={`nav-link admin-nav-link ${isActive('/admin') ? 'active' : ''}`}>
+                <ShieldCheck size={16} />
+                <span>Admin Portal</span>
+              </Link>
+            )}
           </>
         )}
-
-        <Link to="/owner" className={`nav-link owner-nav-link ${isActive('/owner') ? 'active' : ''}`}>
-          <Building2 size={16} />
-          <span>Owner Portal</span>
-        </Link>
-
-        <Link to="/admin" className={`nav-link admin-nav-link ${isActive('/admin') ? 'active' : ''}`}>
-          <ShieldCheck size={16} />
-          <span>Admin Portal</span>
-        </Link>
       </nav>
 
       <div className="header-user-section">
@@ -148,7 +166,7 @@ function Header() {
             <div className="role-switch-wrapper" style={{ position: 'relative' }}>
               <button 
                 className="role-switch-btn"
-                title="Switch Portal Role View"
+                title="Switch Authorized View"
                 onClick={() => setShowRoleDropdown(!showRoleDropdown)}
               >
                 <Repeat size={14} />
@@ -158,25 +176,35 @@ function Header() {
 
               {showRoleDropdown && (
                 <div className="role-dropdown-menu glass-card">
-                  <div className="role-dropdown-header">Switch Portal Access</div>
+                  <div className="role-dropdown-header">Switch Role View</div>
+                  
+                  {/* Driver Mode: Available to all roles */}
                   <button 
                     className={`role-dropdown-item ${role === 'DRIVER' ? 'active' : ''}`}
                     onClick={() => handleRoleSelect('DRIVER')}
                   >
                     <Car size={15} /> Driver (Customer)
                   </button>
-                  <button 
-                    className={`role-dropdown-item ${role === 'OWNER' ? 'active' : ''}`}
-                    onClick={() => handleRoleSelect('OWNER')}
-                  >
-                    <Building2 size={15} /> Space Owner (Host)
-                  </button>
-                  <button 
-                    className={`role-dropdown-item ${role === 'ADMIN' ? 'active' : ''}`}
-                    onClick={() => handleRoleSelect('ADMIN')}
-                  >
-                    <ShieldCheck size={15} /> Platform Admin
-                  </button>
+
+                  {/* Owner Mode: Available to OWNER and ADMIN */}
+                  {(currentRole === 'OWNER' || currentRole === 'ADMIN') && (
+                    <button 
+                      className={`role-dropdown-item ${role === 'OWNER' ? 'active' : ''}`}
+                      onClick={() => handleRoleSelect('OWNER')}
+                    >
+                      <Building2 size={15} /> Space Owner (Host)
+                    </button>
+                  )}
+
+                  {/* Admin Mode: Available ONLY to ADMIN */}
+                  {currentRole === 'ADMIN' && (
+                    <button 
+                      className={`role-dropdown-item ${role === 'ADMIN' ? 'active' : ''}`}
+                      onClick={() => handleRoleSelect('ADMIN')}
+                    >
+                      <ShieldCheck size={15} /> Platform Admin
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -237,7 +265,7 @@ function Header() {
               </div>
               <div className="user-info">
                 <span className="user-name">{user.full_name || 'User'}</span>
-                <span className="user-role-label">{role} PORTAL</span>
+                <span className="user-role-label">{currentRole}</span>
               </div>
             </div>
 
@@ -263,3 +291,4 @@ function Header() {
 }
 
 export default Header;
+

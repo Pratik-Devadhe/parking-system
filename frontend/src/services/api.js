@@ -188,22 +188,38 @@ let mockSettings = [
 ];
 
 // Helper to make API requests with graceful fallback
+
 async function apiFetch(endpoint, options = {}) {
-  try {
-    const res = await fetch(`${BASE_URL}${endpoint}`, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-      },
-      ...options
-    });
-    if (res.ok) {
-      return await res.json();
+    try {
+        const token = localStorage.getItem("parkx_token");
+
+        console.log("token : ", token);
+
+        const res = await fetch(`${BASE_URL}${endpoint}`, {
+            ...options,
+            headers: {
+                "Content-Type": "application/json",
+
+                ...(token && {
+                    Authorization: `Bearer ${token}`
+                }),
+
+                ...options.headers
+            }
+        });
+
+        if (res.ok) {
+            return await res.json();
+        }
+
+        return null;
+
+    } catch (err) {
+        console.log(
+            `Backend endpoint ${endpoint} offline/unavailable, serving fallback mock data.`
+        );
+        return null;
     }
-  } catch (err) {
-    console.log(`Backend endpoint ${endpoint} offline/unavailable, serving fallback mock data.`);
-  }
-  return null;
 }
 
 export const apiService = {
@@ -298,10 +314,24 @@ export const apiService = {
 
 
   // 2. LOCATION ENDPOINTS
+
+
   getLocations: async () => {
     const data = await apiFetch('/location');
     if (data && Array.isArray(data) && data.length > 0) return data;
     return mockLocations;
+  },
+
+  getLocationById: async (id)=> {
+      try{
+
+        const data = await apiFetch(`/location/${id}`);
+
+        return data;
+
+      }catch(err){
+        return err;
+      }
   },
 
   getLocationsByOwner: async (ownerId) => {

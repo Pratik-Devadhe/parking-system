@@ -43,13 +43,13 @@
 .owner-title {
   font-size: 2.2rem;
   font-weight: 900;
-  color: var(--text-main);
+  color: #ffffff;
   letter-spacing: -0.5px;
   margin-bottom: 6px;
 }
 
 .owner-subtitle {
-  color: var(--text-muted);
+  color: #ffffff;
   font-size: 0.95rem;
   max-width: 700px;
 }
