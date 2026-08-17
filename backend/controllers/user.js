@@ -13,22 +13,38 @@ module.exports.getAllUsers = async (req, res) => {
 module.exports.createUser = async (req, res) => {
     const { full_name, email, phone, password, role, is_verified } = req.body;
 
+    if (!full_name || !email || !password) {
+        return res.status(400).json({ message: 'Full name, email, and password are required.' });
+    }
+
+    const requestedRole = (role || 'DRIVER').toUpperCase();
+    if (requestedRole === 'ADMIN') {
+        return res.status(400).json({ message: 'Registration as ADMIN is not allowed. System Administrator is a restricted single account.' });
+    }
+
     try {
         const result = await pool.query(
             `INSERT INTO users (full_name, email, phone, password, role, is_verified)
              VALUES ($1, $2, $3, $4, $5, COALESCE($6, FALSE)) RETURNING id, full_name, email, phone, role, is_verified, status, created_at`,
-            [full_name, email, phone, password, role || 'DRIVER', is_verified]
+            [full_name, email, phone, password, requestedRole, is_verified]
         );
         const user = result.rows[0];
         const token = generateToken(user);
         res.status(201).json({ message: 'User registered successfully', token, user });
     } catch (err) {
+        if (err.code === '23505') {
+            return res.status(400).json({ message: 'An account with this email address already exists.' });
+        }
         res.status(500).json({ error: err.message });
     }
 };
 
 module.exports.loginUser = async (req, res) => {
-    const { email, password } = req.body;
+    const { email, password, role: requestedRole } = req.body;
+
+    if (!email || !password) {
+        return res.status(400).json({ message: 'Email and password are required.' });
+    }
 
     try {
         const result = await pool.query(
@@ -47,6 +63,10 @@ module.exports.loginUser = async (req, res) => {
 
         if (user.status === 'SUSPENDED') {
             return res.status(403).json({ message: 'Account is suspended. Please contact support.' });
+        }
+
+        if (requestedRole && user.role.toUpperCase() !== requestedRole.toUpperCase()) {
+            return res.status(403).json({ message: `Role mismatch: This account is registered as ${user.role}, not ${requestedRole}.` });
         }
 
         delete user.password;

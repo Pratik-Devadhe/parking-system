@@ -87,6 +87,10 @@
   gap: 4px;
 }
 
+.auth-role-toggle.two-roles {
+  grid-template-columns: 1fr 1fr;
+}
+
 .auth-role-btn {
   padding: 10px 6px;
   border-radius: 8px;

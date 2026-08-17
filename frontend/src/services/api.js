@@ -38,7 +38,7 @@ let mockLocations = [
   {
     id: 3,
     owner_id: 3,
-    name: 'Silicon Hub Tech Park',
+    name: 'Silicon Hub Tech',
     address: '450 Innovation Way, Tech District',
     total_slots: 30,
     latitude: 40.7484,
@@ -238,6 +238,9 @@ export const apiService = {
   },
 
   createUser: async (userData) => {
+    if (userData.role === 'ADMIN') {
+      return { error: 'Registration as ADMIN is not allowed. System Administrator is a restricted single account.' };
+    }
     const data = await apiFetch('/create_user', {
       method: 'POST',
       body: JSON.stringify(userData)

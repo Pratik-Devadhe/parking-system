@@ -45,21 +45,25 @@ function UsersPage() {
     e.preventDefault();
     if (!newUser.full_name || !newUser.email) return;
 
-    const created = {
-      id: users.length + 1,
-      ...newUser,
-      is_verified: true,
-      status: 'ACTIVE'
-    };
+    if (newUser.role === 'ADMIN') {
+      alert('Creating additional ADMIN users is prohibited. System Administrator is a restricted single account.');
+      return;
+    }
 
-    setUsers([created, ...users]);
-    setShowAddModal(false);
-    setNewUser({ full_name: '', email: '', phone: '', role: 'DRIVER', password: '' });
+    const res = await apiService.createUser(newUser);
+    if (res && !res.error) {
+      fetchUsers();
+      setShowAddModal(false);
+      setNewUser({ full_name: '', email: '', phone: '', role: 'DRIVER', password: '' });
+    } else {
+      alert(res?.error || 'Failed to create user.');
+    }
   };
 
-  const handleDeleteUser = (id) => {
+  const handleDeleteUser = async (id) => {
     if (window.confirm('Are you sure you want to remove this user from the directory?')) {
-      setUsers(users.filter(u => u.id !== id));
+      await apiService.deleteUser(id);
+      fetchUsers();
     }
   };
 
@@ -314,7 +318,6 @@ function UsersPage() {
                     onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
                   >
                     <option value="DRIVER">DRIVER</option>
-                    <option value="ADMIN">ADMIN</option>
                     <option value="OWNER">OWNER</option>
                   </select>
                 </div>

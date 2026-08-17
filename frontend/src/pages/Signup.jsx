@@ -28,7 +28,6 @@ function Signup() {
     const hostname = window.location.hostname;
     if (hostname.startsWith('admin.') || hostname === 'admin.localhost') {
       setIsAdminDomain(true);
-      setFormData(prev => ({ ...prev, role: 'ADMIN' }));
     }
   }, []);
 
@@ -44,14 +43,17 @@ function Signup() {
       return;
     }
 
+    if (formData.role === 'ADMIN') {
+      setError('Registration as ADMIN is not allowed. System Administrator is a restricted single account.');
+      return;
+    }
+
     setLoading(true);
     const res = await signup(formData);
     setLoading(false);
 
     if (res.success) {
-      if (formData.role === 'ADMIN') {
-        navigate('/admin');
-      } else if (formData.role === 'OWNER') {
+      if (formData.role === 'OWNER') {
         navigate('/owner');
       } else {
         navigate('/');
@@ -70,21 +72,21 @@ function Signup() {
           </div>
           <h2 className="auth-title">Create PARK-X Account</h2>
           <p className="auth-subtitle">
-            Join the smart parking network for Drivers, Parking Owners, and Admins
+            Join the smart parking network for Drivers and Parking Owners
           </p>
 
           <div className="auth-endpoint-notice">
             <Globe size={13} color="var(--primary-teal)" />
             <span>
               {isAdminDomain 
-                ? 'Registering via admin.localhost (Admin Portal)' 
-                : 'Registering via localhost (Driver/Owner Portal)'}
+                ? 'Admin Host Domain Active (Admin Registration Restricted)' 
+                : 'Standard Host: Driver & Owner Account Registration'}
             </span>
           </div>
         </div>
 
-        {/* 3-Role Selection Switcher */}
-        <div className="auth-role-toggle 3-roles">
+        {/* 2-Role Selection Switcher */}
+        <div className="auth-role-toggle two-roles">
           <button
             type="button"
             onClick={() => setFormData({ ...formData, role: 'DRIVER' })}
@@ -98,13 +100,6 @@ function Signup() {
             className={`auth-role-btn ${formData.role === 'OWNER' ? 'active' : ''}`}
           >
             <Building2 size={14} /> Owner
-          </button>
-          <button
-            type="button"
-            onClick={() => setFormData({ ...formData, role: 'ADMIN' })}
-            className={`auth-role-btn ${formData.role === 'ADMIN' ? 'active' : ''}`}
-          >
-            <ShieldCheck size={14} /> Admin
           </button>
         </div>
 
@@ -243,17 +238,6 @@ function Signup() {
               </div>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                 Owner accounts allow you to list parking locations, manage hourly slots, set approval rules, and monitor real-time earnings.
-              </p>
-            </div>
-          )}
-
-          {formData.role === 'ADMIN' && (
-            <div className="auth-vehicle-section">
-              <div className="auth-vehicle-title">
-                <ShieldCheck size={16} color="var(--accent-indigo)" /> System Administrator Access
-              </div>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                Admin privileges include verifying parking locations, managing user bans, resolving dispute tickets, and system settings.
               </p>
             </div>
           )}

@@ -22,7 +22,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
       return (
         <div className="main-content" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
           <div className="glass-card" style={{ maxWidth: '520px', width: '100%', padding: '36px 30px', textAlign: 'center', borderRadius: '16px', border: '1px solid var(--border-strong)', background: 'var(--bg-card)' }}>
-            <div style={{ widthght: '64px', borderRadius: '50%', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px auto', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px auto', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
               <ShieldAlert size={34} />
             </div>
             <h2 style={{ fontSize: '1.5rem', fontWeight: '900', marginBottom: '10px', color: 'var(--text-main)' }}>Access Denied</h2>
