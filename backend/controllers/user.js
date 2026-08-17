@@ -11,11 +11,15 @@ module.exports.getAllUsers = async (req, res) => {
 };
 
 module.exports.createUser = async (req, res) => {
-    const { full_name, email, phone, password, role, is_verified } = req.body;
+    const { full_name, email, phone, password, role, is_verified, vehicle_number, vehicle_type, brand, model } = req.body;
 
     if (!full_name || !email || !password) {
         return res.status(400).json({ message: 'Full name, email, and password are required.' });
     }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPassword = password.trim();
+    const cleanName = full_name.trim();
 
     const requestedRole = (role || 'DRIVER').toUpperCase();
     if (requestedRole === 'ADMIN') {
@@ -26,9 +30,23 @@ module.exports.createUser = async (req, res) => {
         const result = await pool.query(
             `INSERT INTO users (full_name, email, phone, password, role, is_verified)
              VALUES ($1, $2, $3, $4, $5, COALESCE($6, FALSE)) RETURNING id, full_name, email, phone, role, is_verified, status, created_at`,
-            [full_name, email, phone, password, requestedRole, is_verified]
+            [cleanName, cleanEmail, phone ? phone.trim() : null, cleanPassword, requestedRole, is_verified]
         );
         const user = result.rows[0];
+
+        if (requestedRole === 'DRIVER' && vehicle_number) {
+            try {
+                await pool.query(
+                    `INSERT INTO vehicles (user_id, vehicle_number, vehicle_type, brand, model)
+                     VALUES ($1, $2, COALESCE($3, 'FOUR_WHEELER'), $4, $5)
+                     ON CONFLICT (vehicle_number) DO NOTHING`,
+                    [user.id, vehicle_number.trim(), vehicle_type || 'FOUR_WHEELER', brand || '', model || '']
+                );
+            } catch (vErr) {
+                console.error('Auto-creating vehicle error on signup:', vErr);
+            }
+        }
+
         const token = generateToken(user);
         res.status(201).json({ message: 'User registered successfully', token, user });
     } catch (err) {
@@ -46,10 +64,13 @@ module.exports.loginUser = async (req, res) => {
         return res.status(400).json({ message: 'Email and password are required.' });
     }
 
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPassword = password.trim();
+
     try {
         const result = await pool.query(
-            `SELECT id, full_name, email, phone, role, is_verified, status, password FROM users WHERE email = $1`,
-            [email]
+            `SELECT id, full_name, email, phone, role, is_verified, status, password FROM users WHERE LOWER(email) = $1`,
+            [cleanEmail]
         );
 
         if (result.rows.length === 0) {
@@ -57,7 +78,7 @@ module.exports.loginUser = async (req, res) => {
         }
 
         const user = result.rows[0];
-        if (user.password !== password) {
+        if (user.password !== cleanPassword) {
             return res.status(401).json({ message: 'Invalid email or password' });
         }
 
