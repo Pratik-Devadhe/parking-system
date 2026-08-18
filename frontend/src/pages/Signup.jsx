@@ -26,7 +26,7 @@ function Signup() {
 
   useEffect(() => {
     const hostname = window.location.hostname;
-    if (hostname.startsWith('admin.') || hostname === 'admin.localhost') {
+    if (hostname.startsWith('admin.') || hostname.includes('admin')) {
       setIsAdminDomain(true);
     }
   }, []);

@@ -38,7 +38,7 @@ function Header() {
 
   useEffect(() => {
     const hostname = window.location.hostname;
-    if (hostname.startsWith('admin.') || hostname === 'admin.localhost') {
+    if (hostname.startsWith('admin.') || hostname.includes('admin')) {
       setIsAdminSubdomain(true);
     } else {
       setIsAdminSubdomain(false);
@@ -108,7 +108,7 @@ function Header() {
         {/* DOMAIN INDICATOR */}
         <div className={`subdomain-tag ${isAdminSubdomain ? 'admin-domain' : 'normal-domain'}`} title="Current Host Domain">
           <Globe size={13} />
-          <span>{isAdminSubdomain ? 'admin.localhost' : 'localhost'}</span>
+          <span>{window.location.hostname}</span>
         </div>
       </div>
 

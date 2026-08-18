@@ -17,7 +17,7 @@ function Login() {
 
   useEffect(() => {
     const hostname = window.location.hostname;
-    if (hostname.startsWith('admin.') || hostname === 'admin.localhost') {
+    if (hostname.startsWith('admin.') || hostname.includes('admin')) {
       setIsAdminDomain(true);
       setSelectedRole('ADMIN');
     }
@@ -85,9 +85,7 @@ function Login() {
           <div className="auth-endpoint-notice">
             <Globe size={13} color="var(--primary-teal)" />
             <span>
-              {isAdminDomain 
-                ? 'Active Host: admin.localhost (Admin Subdomain)' 
-                : 'Standard Host: localhost (Driver & Owner Portal)'}
+              Host Domain: {window.location.hostname} ({isAdminDomain ? 'Admin Subdomain' : 'Portal Mode'})
             </span>
           </div>
         </div>

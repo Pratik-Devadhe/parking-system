@@ -23,20 +23,9 @@ const authenticateToken = (req, res, next) => {
         return res.status(401).json({ message: 'Authentication required. No token provided.' });
     }
 
-    // Support both real JWTs and demo fallback tokens
-    if (token.startsWith('demo-token-') || token.startsWith('backend-token-')) {
-        req.user = {
-            id: req.headers['x-user-id'] ? Number(req.headers['x-user-id']) : 1,
-            email: req.headers['x-user-email'] || 'user@parkx.io',
-            role: req.headers['x-user-role'] || 'DRIVER',
-            full_name: 'Demo User'
-        };
-        return next();
-    }
-
     jwt.verify(token, JWT_SECRET, (err, decoded) => {
         if (err) {
-            return res.status(403).json({ message: 'Invalid or expired token.' });
+            return res.status(401).json({ message: 'Invalid or expired token.' });
         }
         req.user = decoded;
         next();
