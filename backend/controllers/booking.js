@@ -1,6 +1,21 @@
 const pool = require('../db.js');
 const { createNotificationHelper } = require('./notification.js');
 
+// Safeguard parking_sessions table & columns in Neon DB
+pool.query(`
+    CREATE TABLE IF NOT EXISTS parking_sessions (
+        id SERIAL PRIMARY KEY,
+        booking_id INTEGER REFERENCES bookings(id) ON DELETE CASCADE,
+        slot_id INTEGER REFERENCES parking_slots(id) ON DELETE CASCADE,
+        entry_time TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        exit_time TIMESTAMP WITH TIME ZONE,
+        parking_fee NUMERIC(10, 2) DEFAULT 0.00,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+`).then(() => {
+    return pool.query(`ALTER TABLE parking_sessions ADD COLUMN IF NOT EXISTS parking_fee NUMERIC(10, 2) DEFAULT 0.00;`);
+}).catch(() => {});
+
 module.exports.createBooking = async (req, res) => {
     const client = await pool.connect();
     try {
@@ -15,7 +30,29 @@ module.exports.createBooking = async (req, res) => {
 
         await client.query("BEGIN");
 
-        // 1. Check overlap
+        // 0. Check vehicle registration
+        if (!vehicle_id) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({ message: "Vehicle is not registered. Please register your vehicle first in 'My Vehicles'." });
+        }
+
+        const vehRes = await client.query(`SELECT id FROM vehicles WHERE id = $1`, [vehicle_id]);
+        if (vehRes.rows.length === 0) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({ message: "Vehicle is not registered. Please register your vehicle first in 'My Vehicles'." });
+        }
+
+        // 1. Check slot status and timeframe overlap
+        const slotCheck = await client.query(`SELECT status FROM parking_slots WHERE id = $1`, [slot_id]);
+        if (slotCheck.rows.length === 0) {
+            await client.query("ROLLBACK");
+            return res.status(404).json({ message: "Parking slot not found." });
+        }
+        if (slotCheck.rows[0].status === 'MAINTENANCE' || slotCheck.rows[0].status === 'BLOCKED') {
+            await client.query("ROLLBACK");
+            return res.status(400).json({ message: `Slot is currently under ${slotCheck.rows[0].status} and cannot be booked.` });
+        }
+
         const availability = await client.query(
             `SELECT id FROM bookings
              WHERE slot_id = $1
@@ -27,7 +64,7 @@ module.exports.createBooking = async (req, res) => {
 
         if (availability.rows.length) {
             await client.query("ROLLBACK");
-            return res.status(400).json({ message: "Slot already booked or blocked for this time slot." });
+            return res.status(400).json({ message: "Slot is already booked or reserved for this time slot." });
         }
 
         // 2. Determine approval mode of location
@@ -312,10 +349,12 @@ module.exports.blockSlotTimeframe = async (req, res) => {
         const vRes = await client.query(`SELECT id FROM vehicles LIMIT 1`);
         if (vRes.rows.length > 0) vId = vRes.rows[0].id;
 
+        const targetUserId = req.user?.id || owner_id;
+
         const result = await client.query(
             `INSERT INTO bookings (user_id, vehicle_id, slot_id, start_time, end_time, booking_status, total_amount)
              VALUES ($1, $2, $3, $4, $5, 'BLOCKED', 0.00) RETURNING *`,
-            [owner_id || 3, vId, slot_id, start_time, end_time]
+            [targetUserId, vId, slot_id, start_time, end_time]
         );
 
         await client.query("COMMIT");
@@ -414,23 +453,29 @@ module.exports.checkIn = async (req, res) => {
         }
 
         const booking = bookingResult.rows[0];
-        if (booking.booking_status !== "CONFIRMED") {
+        if (booking.booking_status === "CANCELLED" || booking.booking_status === "COMPLETED") {
             await client.query("ROLLBACK");
-            return res.status(400).json({ message: "Only CONFIRMED bookings can be checked in." });
+            return res.status(400).json({ message: `Cannot check in. Booking is already ${booking.booking_status}.` });
         }
 
         await client.query(`UPDATE bookings SET booking_status = 'ACTIVE' WHERE id = $1`, [id]);
         await client.query(`UPDATE parking_slots SET status = 'OCCUPIED' WHERE id = $1`, [booking.slot_id]);
 
-        const session = await client.query(
-            `INSERT INTO parking_sessions (booking_id, slot_id, entry_time) VALUES ($1, $2, NOW()) RETURNING *`,
-            [booking.id, booking.slot_id]
-        );
+        let session;
+        const existingSession = await client.query(`SELECT * FROM parking_sessions WHERE booking_id = $1 AND exit_time IS NULL`, [id]);
+        if (existingSession.rows.length > 0) {
+            session = existingSession;
+        } else {
+            session = await client.query(
+                `INSERT INTO parking_sessions (booking_id, slot_id, entry_time) VALUES ($1, $2, NOW()) RETURNING *`,
+                [booking.id, booking.slot_id]
+            );
+        }
 
         await client.query("COMMIT");
 
         res.status(200).json({
-            message: "Vehicle checked in successfully.",
+            message: "Vehicle checked in successfully. Gate barrier unlocked!",
             session: session.rows[0]
         });
     } catch (err) {
@@ -454,29 +499,31 @@ module.exports.checkOut = async (req, res) => {
         }
         
         const bookingRow = bookingResult.rows[0];
-        if (bookingRow.booking_status !== 'ACTIVE') {
+        if (bookingRow.booking_status === 'COMPLETED' || bookingRow.booking_status === 'CANCELLED') {
             await client.query('ROLLBACK');
-            return res.status(400).json({ message: 'Booking is not active. Cannot check out.' });
+            return res.status(400).json({ message: `Booking is already ${bookingRow.booking_status}.` });
         }
 
-        const sessionCheck = await client.query(`SELECT * FROM parking_sessions WHERE booking_id = $1 AND exit_time IS NULL FOR UPDATE`, [id]);
+        let sessionCheck = await client.query(`SELECT * FROM parking_sessions WHERE booking_id = $1 AND exit_time IS NULL FOR UPDATE`, [id]);
         if (sessionCheck.rows.length === 0) {
-            await client.query('ROLLBACK');
-            return res.status(400).json({ message: 'Parking session not found or already checked out.' });
+            sessionCheck = await client.query(
+                `INSERT INTO parking_sessions (booking_id, slot_id, entry_time) VALUES ($1, $2, $3) RETURNING *`,
+                [bookingRow.id, bookingRow.slot_id, bookingRow.start_time || new Date()]
+            );
         }
 
         const session = await client.query(
-            `UPDATE parking_sessions SET exit_time = NOW() WHERE booking_id = $1 RETURNING *`,
+            `UPDATE parking_sessions SET exit_time = NOW() WHERE booking_id = $1 AND exit_time IS NULL RETURNING *`,
             [id]
         );
 
-        const entry = new Date(session.rows[0].entry_time);
-        const exit = new Date(session.rows[0].exit_time);
+        const entry = new Date(session.rows[0]?.entry_time || bookingRow.start_time || new Date());
+        const exit = new Date(session.rows[0]?.exit_time || new Date());
         const hours = Math.max(1, Math.ceil((exit - entry) / (1000 * 60 * 60)));
 
         const slot = await client.query(`SELECT hourly_price FROM parking_slots WHERE id = $1`, [bookingRow.slot_id]);
         const hourlyPrice = slot.rows[0]?.hourly_price || 10;
-        const fee = hours * hourlyPrice;
+        const fee = (hours * hourlyPrice).toFixed(2);
 
         await client.query(`UPDATE parking_sessions SET parking_fee = $1 WHERE booking_id = $2`, [fee, id]);
         await client.query(`UPDATE bookings SET booking_status = 'COMPLETED', total_amount = $1 WHERE id = $2`, [fee, id]);
@@ -487,7 +534,7 @@ module.exports.checkOut = async (req, res) => {
         res.json({
             parking_fee: fee,
             hours: hours,
-            message: "Checkout successful"
+            message: "Checkout successful. Gate barrier unlocked!"
         });
     } catch (err) {
         await client.query("ROLLBACK");

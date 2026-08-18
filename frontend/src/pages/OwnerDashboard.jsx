@@ -25,7 +25,7 @@ import './OwnerDashboard.css';
 
 function OwnerDashboard() {
   const { user, role, switchRole } = useAuth();
-  const ownerId = user?.id || 3;
+  const ownerId = user?.id;
 
   const [activeTab, setActiveTab] = useState('OVERVIEW');
   const [locations, setLocations] = useState([]);
@@ -189,17 +189,7 @@ function OwnerDashboard() {
             List your driveway, garage, commercial parking lot, or open land on Park-X. Set custom rental prices, approve driver reservations, and earn automated monthly payouts.
           </p>
 
-          <div style={{ display: 'flex', gap: '14px', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <button 
-              className="btn btn-primary btn-lg" 
-              onClick={() => {
-                switchRole('OWNER');
-                loadOwnerData();
-              }}
-            >
-              <Sparkles size={18} /> Switch to Owner Portal View
-            </button>
-          </div>
+
         </div>
       </div>
     );
@@ -611,6 +601,43 @@ function OwnerDashboard() {
                 </div>
               </div>
 
+              <div>
+                <label className="field-label">LOCATION IMAGE (UPLOAD FILE OR PASTE URL)</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="input-field"
+                    onChange={(e) => {
+                      const file = e.target.files[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          setNewLocation({ ...newLocation, image_url: reader.result });
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                  />
+                  <input
+                    type="url"
+                    placeholder="Or paste image URL (https://...)"
+                    className="input-field"
+                    value={newLocation.image_url || ''}
+                    onChange={(e) => setNewLocation({ ...newLocation, image_url: e.target.value })}
+                  />
+                  {newLocation.image_url && (
+                    <div style={{ marginTop: '4px', textAlign: 'center' }}>
+                      <img
+                        src={newLocation.image_url}
+                        alt="Location Preview"
+                        style={{ width: '100%', maxHeight: '110px', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--border-strong)' }}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <button type="submit" className="btn btn-primary" style={{ marginTop: '10px', padding: '12px' }}>
                 Publish Parking Listing
               </button>
@@ -698,6 +725,43 @@ function OwnerDashboard() {
                     value={newSlot.monthly_price}
                     onChange={(e) => setNewSlot({ ...newSlot, monthly_price: Number(e.target.value) })}
                   />
+                </div>
+              </div>
+
+              <div>
+                <label className="field-label">SLOT PHOTO (UPLOAD FILE OR PASTE URL)</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="input-field"
+                    onChange={(e) => {
+                      const file = e.target.files[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          setNewSlot({ ...newSlot, image_url: reader.result });
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                  />
+                  <input
+                    type="url"
+                    placeholder="Or paste slot photo URL (https://...)"
+                    className="input-field"
+                    value={newSlot.image_url || ''}
+                    onChange={(e) => setNewSlot({ ...newSlot, image_url: e.target.value })}
+                  />
+                  {newSlot.image_url && (
+                    <div style={{ marginTop: '4px', textAlign: 'center' }}>
+                      <img
+                        src={newSlot.image_url}
+                        alt="Slot Preview"
+                        style={{ width: '100%', maxHeight: '110px', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--border-strong)' }}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 

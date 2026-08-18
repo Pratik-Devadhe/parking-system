@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Lock, Mail, User, ShieldCheck, Building2, ArrowRight, Eye, EyeOff, Sparkles, Globe } from 'lucide-react';
+import { Lock, Mail, User, ShieldCheck, Building2, ArrowRight, Eye, EyeOff, Sparkles } from 'lucide-react';
 import './Auth.css';
 
 function Login() {
@@ -13,15 +13,6 @@ function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [isAdminDomain, setIsAdminDomain] = useState(false);
-
-  useEffect(() => {
-    const hostname = window.location.hostname;
-    if (hostname.startsWith('admin.') || hostname.includes('admin')) {
-      setIsAdminDomain(true);
-      setSelectedRole('ADMIN');
-    }
-  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -46,28 +37,6 @@ function Login() {
     }
   };
 
-  const handleDemoLogin = (role) => {
-    if (role === 'ADMIN') {
-      setEmail('admin.system@parkx.io');
-      setPassword('admin123');
-      setSelectedRole('ADMIN');
-      login('admin.system@parkx.io', 'admin123', 'ADMIN');
-      navigate('/admin');
-    } else if (role === 'OWNER') {
-      setEmail('david.owner@parkx.io');
-      setPassword('owner123');
-      setSelectedRole('OWNER');
-      login('david.owner@parkx.io', 'owner123', 'OWNER');
-      navigate('/owner');
-    } else {
-      setEmail('alex.driver@parkx.io');
-      setPassword('driver123');
-      setSelectedRole('DRIVER');
-      login('alex.driver@parkx.io', 'driver123', 'DRIVER');
-      navigate('/');
-    }
-  };
-
   return (
     <div className="auth-page-container">
       <div className="glass-card auth-card">
@@ -81,13 +50,6 @@ function Login() {
           <p className="auth-subtitle">
             Smart Parking Management & Real-time Slot Telemetry Platform
           </p>
-
-          <div className="auth-endpoint-notice">
-            <Globe size={13} color="var(--primary-teal)" />
-            <span>
-              Host Domain: {window.location.hostname} ({isAdminDomain ? 'Admin Subdomain' : 'Portal Mode'})
-            </span>
-          </div>
         </div>
 
         {/* 3-Role Selection Switcher */}
@@ -113,36 +75,6 @@ function Login() {
           >
             <ShieldCheck size={14} /> Admin
           </button>
-        </div>
-
-        {/* Quick Demo Access Buttons */}
-        <div className="auth-quick-demo-box">
-          <div className="auth-quick-demo-header">
-            <Sparkles size={14} color="var(--primary-teal)" /> ONE-CLICK DEMO ACCESS:
-          </div>
-          <div className="auth-quick-demo-btns">
-            <button 
-              type="button"
-              className="btn btn-secondary btn-sm auth-quick-demo-btn"
-              onClick={() => handleDemoLogin('DRIVER')}
-            >
-              Demo Driver
-            </button>
-            <button 
-              type="button"
-              className="btn btn-secondary btn-sm auth-quick-demo-btn"
-              onClick={() => handleDemoLogin('OWNER')}
-            >
-              Demo Owner
-            </button>
-            <button 
-              type="button"
-              className="btn btn-secondary btn-sm auth-quick-demo-btn"
-              onClick={() => handleDemoLogin('ADMIN')}
-            >
-              Demo Admin
-            </button>
-          </div>
         </div>
 
         {error && (

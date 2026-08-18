@@ -3,15 +3,19 @@ require("dotenv").config({ path: path.resolve(__dirname, '.env') });
 require("dotenv").config({ path: path.resolve(__dirname, '../.env') });
 const { Pool } = require("pg");
 
-// Default connection URI for local PostgreSQL database
-const defaultUrl = "postgresql://postgres:pratik@localhost:5432/parking_system";
-console.log(process.env.DATABASE_URL);
-const connectionString = process.env.DATABASE_URL || defaultUrl;
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+    throw new Error("DATABASE_URL environment variable is missing.");
+}
 
 const isLocal = connectionString.includes("localhost") || connectionString.includes("127.0.0.1");
 
 const poolConfig = {
-    connectionString: connectionString
+    connectionString: connectionString,
+    max: 10,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000
 };
 
 if (!isLocal) {
@@ -21,7 +25,7 @@ if (!isLocal) {
 const pool = new Pool(poolConfig);
 
 pool.on('error', (err) => {
-    console.error('Unexpected error on idle database client', err);
+    // Idle client error listener
 });
 
 module.exports = pool;

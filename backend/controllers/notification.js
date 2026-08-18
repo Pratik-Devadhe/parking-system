@@ -9,7 +9,7 @@ async function createNotificationHelper(userId, title, message, notificationType
             [userId, title, message, notificationType]
         );
     } catch (err) {
-        console.error('Error creating notification:', err.message);
+        // Notification creation error ignored silently to prevent breaking main flows
     }
 }
 

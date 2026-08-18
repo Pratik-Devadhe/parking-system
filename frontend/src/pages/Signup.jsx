@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { User, Mail, Phone, Lock, Car, ShieldCheck, Building2, ArrowRight, Globe } from 'lucide-react';
+import { User, Mail, Phone, Lock, Car, ShieldCheck, Building2, ArrowRight } from 'lucide-react';
 import './Auth.css';
 
 function Signup() {
@@ -22,14 +22,6 @@ function Signup() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [isAdminDomain, setIsAdminDomain] = useState(false);
-
-  useEffect(() => {
-    const hostname = window.location.hostname;
-    if (hostname.startsWith('admin.') || hostname.includes('admin')) {
-      setIsAdminDomain(true);
-    }
-  }, []);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -74,15 +66,6 @@ function Signup() {
           <p className="auth-subtitle">
             Join the smart parking network for Drivers and Parking Owners
           </p>
-
-          <div className="auth-endpoint-notice">
-            <Globe size={13} color="var(--primary-teal)" />
-            <span>
-              {isAdminDomain 
-                ? 'Admin Host Domain Active (Admin Registration Restricted)' 
-                : 'Standard Host: Driver & Owner Account Registration'}
-            </span>
-          </div>
         </div>
 
         {/* 2-Role Selection Switcher */}

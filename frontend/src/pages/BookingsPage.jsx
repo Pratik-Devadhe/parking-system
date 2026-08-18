@@ -47,12 +47,30 @@ function BookingsPage() {
   }, [user]);
 
   const handleCheckIn = async (id) => {
-    await apiService.checkIn(id);
+    try {
+      const res = await apiService.checkIn(id);
+      if (res && res.error) {
+        alert(res.error);
+      } else {
+        alert(res?.message || 'Check-In Successful! Gate Barrier Unlocked.');
+      }
+    } catch (err) {
+      alert('Failed to process Check-In gate request.');
+    }
     fetchBookings();
   };
 
   const handleCheckOut = async (id) => {
-    await apiService.checkOut(id);
+    try {
+      const res = await apiService.checkOut(id);
+      if (res && res.error) {
+        alert(res.error);
+      } else {
+        alert(res?.message || 'Check-Out Successful! Barrier Gate Unlocked.');
+      }
+    } catch (err) {
+      alert('Failed to process Check-Out gate request.');
+    }
     fetchBookings();
   };
 
@@ -156,13 +174,7 @@ function BookingsPage() {
                   </div>
 
                   <div className="booking-card-action-btns">
-                    {isPending && (
-                      <span className="badge badge-pending">
-                        Waiting for Owner Approval
-                      </span>
-                    )}
-
-                    {(isConfirmed || isActive) && (
+                    {(isConfirmed || isActive || isPending) && (
                       <>
                         <button 
                           className="btn btn-secondary btn-sm"
@@ -171,7 +183,7 @@ function BookingsPage() {
                           <QrCode size={16} /> Digital Pass
                         </button>
 
-                        {isConfirmed && (
+                        {(isConfirmed || isPending) && (
                           <button 
                             className="btn btn-primary btn-sm"
                             onClick={() => handleCheckIn(b.id)}
@@ -189,12 +201,14 @@ function BookingsPage() {
                           </button>
                         )}
 
-                        <button 
-                          className="btn btn-danger btn-sm"
-                          onClick={() => handleCancel(b.id)}
-                        >
-                          Cancel
-                        </button>
+                        {!isCompleted && !isCancelled && (
+                          <button 
+                            className="btn btn-danger btn-sm"
+                            onClick={() => handleCancel(b.id)}
+                          >
+                            Cancel
+                          </button>
+                        )}
                       </>
                     )}
 

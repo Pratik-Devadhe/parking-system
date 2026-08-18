@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { apiService } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { X, Calendar, Clock, Car, CreditCard, ShieldCheck, CheckCircle2, DollarSign } from 'lucide-react';
+import { X, Calendar, Clock, Car, CreditCard, ShieldCheck, CheckCircle2, DollarSign, AlertTriangle } from 'lucide-react';
 import './BookingModal.css';
 
 function BookingModal({ location, slot, onClose, onBookingSuccess }) {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const [vehicles, setVehicles] = useState([]);
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
-  const [customPlate, setCustomPlate] = useState('');
   
   const now = new Date();
   const defaultStart = new Date(now.getTime() + 5 * 60000).toISOString().slice(0, 16);
@@ -17,7 +18,7 @@ function BookingModal({ location, slot, onClose, onBookingSuccess }) {
 
   const [startTime, setStartTime] = useState(defaultStart);
   const [endTime, setEndTime] = useState(defaultEnd);
-  const [paymentMethod, setPaymentMethod] = useState('CARD');
+  const [paymentMethod, setPaymentMethod] = useState('DIRECT');
   
   const [submitting, setSubmitting] = useState(false);
   const [confirmedBooking, setConfirmedBooking] = useState(null);
@@ -27,8 +28,8 @@ function BookingModal({ location, slot, onClose, onBookingSuccess }) {
     async function loadUserVehicles() {
       if (user) {
         const vList = await apiService.getVehiclesByUser(user.id);
-        setVehicles(vList);
-        if (vList.length > 0) {
+        setVehicles(vList || []);
+        if (vList && vList.length > 0) {
           setSelectedVehicleId(vList[0].id);
         }
       }
@@ -47,6 +48,18 @@ function BookingModal({ location, slot, onClose, onBookingSuccess }) {
     e.preventDefault();
     setError('');
 
+    // 1. Vehicle Registration Check
+    if (!vehicles || vehicles.length === 0 || !selectedVehicleId) {
+      setError('Vehicle is not registered! Please register your vehicle first in "My Vehicles".');
+      return;
+    }
+
+    // 2. Slot Availability Check
+    if (slot && slot.status && slot.status !== 'AVAILABLE') {
+      setError(`Slot ${slot.slot_number} is currently marked as ${slot.status} and cannot be booked.`);
+      return;
+    }
+
     if (endMs <= startMs) {
       setError('End time must be after start time.');
       return;
@@ -59,7 +72,7 @@ function BookingModal({ location, slot, onClose, onBookingSuccess }) {
       const endIso = new Date(endTime).toISOString();
 
       // Check slot availability via backend POST /booking/availability
-      const availCheck = await apiService.checkAvailability(slotId, startIso, endIso);
+      const availCheck = await apiService.checkAvailability({ slot_id: slotId, start_time: startIso, end_time: endIso });
       if (availCheck && availCheck.available === false) {
         setSubmitting(false);
         setError(availCheck.message || 'Slot is already booked for the selected time window.');
@@ -67,8 +80,8 @@ function BookingModal({ location, slot, onClose, onBookingSuccess }) {
       }
 
       const bookingData = {
-        user_id: user ? user.id : 1,
-        vehicle_id: selectedVehicleId || 1,
+        user_id: user?.id,
+        vehicle_id: selectedVehicleId,
         slot_id: slotId,
         start_time: startIso,
         end_time: endIso,
@@ -86,7 +99,6 @@ function BookingModal({ location, slot, onClose, onBookingSuccess }) {
       }
     } catch (err) {
       setSubmitting(false);
-      console.log(err);
       setError('Error communicating with booking server.');
     }
   };
@@ -168,29 +180,41 @@ function BookingModal({ location, slot, onClose, onBookingSuccess }) {
             {/* Vehicle Selection */}
             <div>
               <label className="booking-field-label">
-                SELECT VEHICLE
+                SELECT REGISTERED VEHICLE *
               </label>
               {vehicles.length > 0 ? (
                 <select
                   className="input-field"
                   value={selectedVehicleId}
                   onChange={(e) => setSelectedVehicleId(e.target.value)}
+                  required
                 >
                   {vehicles.map((v) => (
                     <option key={v.id} value={v.id}>
-                      {v.brand} {v.model} ({v.vehicle_number})
+                      {v.brand} {v.model} ({v.vehicle_number}) - {v.vehicle_type}
                     </option>
                   ))}
                 </select>
               ) : (
-                <input
-                  type="text"
-                  placeholder="Enter License Plate (e.g. NY-PX-9900)"
-                  className="input-field"
-                  value={customPlate}
-                  onChange={(e) => setCustomPlate(e.target.value)}
-                  required
-                />
+                <div style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-strong)', padding: '14px', borderRadius: 'var(--radius-sm)', color: 'var(--text-main)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#e53e3e', fontWeight: '800', fontSize: '0.88rem' }}>
+                    <AlertTriangle size={18} /> Vehicle is not registered!
+                  </div>
+                  <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                    You must register your vehicle first before reserving a slot.
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    style={{ alignSelf: 'flex-start', marginTop: '4px' }}
+                    onClick={() => {
+                      onClose();
+                      navigate('/vehicles');
+                    }}
+                  >
+                    <Car size={14} /> Register Vehicle in "My Vehicles"
+                  </button>
+                </div>
               )}
             </div>
 
@@ -225,32 +249,18 @@ function BookingModal({ location, slot, onClose, onBookingSuccess }) {
               </div>
             </div>
 
-            {/* Payment Method Selector */}
+            {/* Payment Method Selector (Direct Confirmation Mode) */}
             <div>
               <label className="booking-field-label">
-                PAYMENT METHOD
+                RESERVATION METHOD
               </label>
               <div className="payment-methods-grid">
                 <button
                   type="button"
-                  onClick={() => setPaymentMethod('CARD')}
-                  className={`payment-method-btn ${paymentMethod === 'CARD' ? 'active' : ''}`}
+                  onClick={() => setPaymentMethod('DIRECT')}
+                  className={`payment-method-btn ${paymentMethod === 'DIRECT' ? 'active' : ''}`}
                 >
-                  Credit Card
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('APPLE')}
-                  className={`payment-method-btn ${paymentMethod === 'APPLE' ? 'active' : ''}`}
-                >
-                  Apple Pay
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('UPI')}
-                  className={`payment-method-btn ${paymentMethod === 'UPI' ? 'active' : ''}`}
-                >
-                  UPI / Wallet
+                  Direct Confirmation (No Payment Gateway Needed)
                 </button>
               </div>
             </div>
@@ -262,7 +272,7 @@ function BookingModal({ location, slot, onClose, onBookingSuccess }) {
                 <div style={{ fontSize: '0.78rem', color: 'var(--text-subtle)' }}>Includes barrier entry token & sensor lock</div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Estimated Cost</span>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Total Slot Fee</span>
                 <div style={{ fontSize: '1.4rem', fontWeight: '800', color: '#ffffff' }}>${totalPrice}</div>
               </div>
             </div>
@@ -270,9 +280,9 @@ function BookingModal({ location, slot, onClose, onBookingSuccess }) {
             <button
               type="submit"
               className="btn btn-primary booking-submit-btn"
-              disabled={submitting}
+              disabled={submitting || vehicles.length === 0}
             >
-              {submitting ? 'Processing Payment...' : `Confirm & Pay $${totalPrice}`}
+              {submitting ? 'Confirming Reservation...' : vehicles.length === 0 ? 'Vehicle Registration Required' : `Confirm Slot Reservation ($${totalPrice})`}
             </button>
           </form>
         )}

@@ -43,7 +43,7 @@ module.exports.createUser = async (req, res) => {
                     [user.id, vehicle_number.trim(), vehicle_type || 'FOUR_WHEELER', brand || '', model || '']
                 );
             } catch (vErr) {
-                console.error('Auto-creating vehicle error on signup:', vErr);
+                // Ignore vehicle auto-creation failure on signup
             }
         }
 

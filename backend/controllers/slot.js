@@ -1,9 +1,10 @@
 const pool = require("../db");
 
+// Ensure image_url column exists on parking_slots table in Neon DB
+pool.query(`ALTER TABLE parking_slots ADD COLUMN IF NOT EXISTS image_url TEXT;`).catch(() => {});
+
 module.exports.createSlot = async (req, res) => {
-
     try {
-
         const {
             location_id,
             slot_number,
@@ -12,7 +13,8 @@ module.exports.createSlot = async (req, res) => {
             dimensions,
             hourly_price,
             daily_price,
-            monthly_price
+            monthly_price,
+            image_url
         } = req.body;
 
         const result = await pool.query(
@@ -26,34 +28,32 @@ module.exports.createSlot = async (req, res) => {
                 dimensions,
                 hourly_price,
                 daily_price,
-                monthly_price
+                monthly_price,
+                image_url
             )
             VALUES
-            ($1,$2,$3,$4,$5,$6,$7,$8)
+            ($1,$2,$3,$4,$5,$6,$7,$8,$9)
             RETURNING *
             `,
             [
                 location_id,
                 slot_number,
-                vehicle_type,
-                status,
-                dimensions,
-                hourly_price,
-                daily_price,
-                monthly_price
+                vehicle_type || 'FOUR_WHEELER',
+                status || 'AVAILABLE',
+                dimensions || '',
+                hourly_price || 10.00,
+                daily_price || 50.00,
+                monthly_price || 200.00,
+                image_url || null
             ]
         );
 
         res.status(201).json(result.rows[0]);
-
     } catch (err) {
-
         res.status(500).json({
             error: err.message
         });
-
     }
-
 };
 
 module.exports.getAllSlots = async (req, res) => {
@@ -177,11 +177,8 @@ module.exports.getAvailableSlots = async (req, res) => {
 
 
 module.exports.updateSlot = async (req, res) => {
-
     try {
-
         const { id } = req.params;
-
         const {
             slot_number,
             vehicle_type,
@@ -189,21 +186,23 @@ module.exports.updateSlot = async (req, res) => {
             dimensions,
             hourly_price,
             daily_price,
-            monthly_price
+            monthly_price,
+            image_url
         } = req.body;
 
         const result = await pool.query(
             `
             UPDATE parking_slots
             SET
-                slot_number = $1,
-                vehicle_type = $2,
-                status = $3,
-                dimensions = $4,
-                hourly_price = $5,
-                daily_price = $6,
-                monthly_price = $7
-            WHERE id = $8
+                slot_number = COALESCE($1, slot_number),
+                vehicle_type = COALESCE($2, vehicle_type),
+                status = COALESCE($3, status),
+                dimensions = COALESCE($4, dimensions),
+                hourly_price = COALESCE($5, hourly_price),
+                daily_price = COALESCE($6, daily_price),
+                monthly_price = COALESCE($7, monthly_price),
+                image_url = COALESCE($8, image_url)
+            WHERE id = $9
             RETURNING *
             `,
             [
@@ -214,20 +213,17 @@ module.exports.updateSlot = async (req, res) => {
                 hourly_price,
                 daily_price,
                 monthly_price,
+                image_url,
                 id
             ]
         );
 
         res.json(result.rows[0]);
-
     } catch (err) {
-
         res.status(500).json({
             error: err.message
         });
-
     }
-
 };
 
 module.exports.deleteSlot = async (req, res) => {

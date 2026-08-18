@@ -15,7 +15,6 @@ import {
   Building2,
   Bell,
   Check,
-  Globe,
   Sun,
   Moon,
   ChevronDown
@@ -31,34 +30,24 @@ function Header() {
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
-  const [isAdminSubdomain, setIsAdminSubdomain] = useState(false);
 
-  const userId = user?.id || 1;
+  const userId = user?.id;
   const currentRole = (user?.role || role || 'DRIVER').toUpperCase();
 
-  useEffect(() => {
-    const hostname = window.location.hostname;
-    if (hostname.startsWith('admin.') || hostname.includes('admin')) {
-      setIsAdminSubdomain(true);
-    } else {
-      setIsAdminSubdomain(false);
-    }
-  }, []);
-
   const loadNotifications = async () => {
-    if (user) {
+    if (userId) {
       const data = await apiService.getNotifications(userId);
       setNotifications(data || []);
     }
   };
 
   useEffect(() => {
-    if (user) {
+    if (userId) {
       loadNotifications();
       const interval = setInterval(loadNotifications, 10000);
       return () => clearInterval(interval);
     }
-  }, [user, userId]);
+  }, [userId]);
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
@@ -68,8 +57,10 @@ function Header() {
   };
 
   const handleMarkAllRead = async () => {
-    await apiService.markAllNotificationsRead(userId);
-    loadNotifications();
+    if (userId) {
+      await apiService.markAllNotificationsRead(userId);
+      loadNotifications();
+    }
   };
 
   const handleRoleSelect = (targetRole) => {
@@ -104,12 +95,6 @@ function Header() {
             PARK<span className="brand-accent">X</span>
           </div>
         </Link>
-
-        {/* DOMAIN INDICATOR */}
-        <div className={`subdomain-tag ${isAdminSubdomain ? 'admin-domain' : 'normal-domain'}`} title="Current Host Domain">
-          <Globe size={13} />
-          <span>{window.location.hostname}</span>
-        </div>
       </div>
 
       <nav className="header-nav">

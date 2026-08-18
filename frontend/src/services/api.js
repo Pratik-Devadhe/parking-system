@@ -1,11 +1,7 @@
 
 const BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/+$/, "");
 
-if (!BASE_URL) {
-  console.error(
-    "VITE_API_URL is not configured. Please add VITE_API_URL to your Vercel environment variables."
-  );
-}
+
 
 /**
  * Centralized API request helper.
@@ -26,8 +22,6 @@ async function apiFetch(endpoint, options = {}) {
   const token = localStorage.getItem("parkx_token");
 
   const url = `${BASE_URL}${endpoint}`;
-
-  console.log(`[API] ${options.method || "GET"} ${url}`);
 
   try {
     const res = await fetch(url, {
@@ -100,8 +94,6 @@ async function apiFetch(endpoint, options = {}) {
     networkError.status = 0;
     networkError.cause = err;
     networkError.endpoint = endpoint;
-
-    console.error(`[API NETWORK ERROR] ${url}`, err);
 
     throw networkError;
   }
@@ -288,6 +280,7 @@ export const apiService = {
       hourly_price: Number(slotData.hourly_price),
       daily_price: Number(slotData.daily_price),
       monthly_price: Number(slotData.monthly_price),
+      image_url: slotData.image_url || ""
     };
 
     return await apiFetch("/slot", {

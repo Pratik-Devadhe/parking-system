@@ -14,6 +14,8 @@ router.patch('/:id/approve', bookingController.approveBooking);
 router.patch('/:id/reject', bookingController.rejectBooking);
 router.patch('/:id/cancel', bookingController.cancelBooking);
 router.post('/:id/checkin', bookingController.checkIn);
+router.patch('/:id/checkin', bookingController.checkIn);
 router.post('/:id/checkout', bookingController.checkOut);
+router.patch('/:id/checkout', bookingController.checkOut);
 
 module.exports = router;

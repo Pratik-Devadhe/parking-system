@@ -18,12 +18,23 @@ function VehiclesPage() {
     model: ''
   });
 
+  const [error, setError] = useState('');
+
   const fetchVehicles = async () => {
     setLoading(true);
-    const userId = user ? user.id : 1;
-    const data = await apiService.getVehiclesByUser(userId);
-    setVehicles(data);
-    setLoading(false);
+    setError('');
+    try {
+      if (user?.id) {
+        const data = await apiService.getVehiclesByUser(user.id);
+        setVehicles(data || []);
+      } else {
+        setVehicles([]);
+      }
+    } catch (err) {
+      setError('Unable to connect to server. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -36,20 +47,20 @@ function VehiclesPage() {
 
     const payload = {
       ...newVehicle,
-      user_id: user ? user.id : 1
+      user_id: user?.id
     };
 
-    const res = await apiService.createVehicle(payload);
-
-    console.log(res);
-
-    if (res) {
-      setShowAddModal(false);
-      setNewVehicle({ vehicle_number: 'kk-jj-8510', vehicle_type: 'FOUR_WHEELER', brand: 'BMW', model: 'M4' }); // reset the form
-      fetchVehicles();
-    } else {
-      alert('Failed to register vehicle.');
-      console.log("error");
+    try {
+      const res = await apiService.createVehicle(payload);
+      if (res) {
+        setShowAddModal(false);
+        setNewVehicle({ vehicle_number: '', vehicle_type: 'FOUR_WHEELER', brand: '', model: '' });
+        fetchVehicles();
+      } else {
+        alert('Failed to register vehicle.');
+      }
+    } catch (err) {
+      alert('Unable to register vehicle. Please check your connection.');
     }
   };
 
@@ -77,7 +88,13 @@ function VehiclesPage() {
         </button>
       </div>
 
-      {loading ? (
+      {error ? (
+        <div className="glass-card vehicles-empty-card" style={{ padding: '40px', textAlign: 'center' }}>
+          <h3 style={{ color: 'var(--text-main)', marginBottom: '8px' }}>Unable to load vehicles</h3>
+          <p style={{ color: 'var(--text-muted)', marginBottom: '16px' }}>{error}</p>
+          <button className="btn btn-primary" onClick={fetchVehicles}>Retry</button>
+        </div>
+      ) : loading ? (
         <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)' }}>
           Loading registered fleet...
         </div>

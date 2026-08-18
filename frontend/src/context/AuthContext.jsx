@@ -2,7 +2,6 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 const getApiUrl = () => {
   const url = import.meta.env.VITE_API_URL;
   if (!url) {
-    console.error("CRITICAL CONFIGURATION ERROR: VITE_API_URL environment variable is missing!");
     throw new Error("VITE_API_URL environment variable is not configured.");
   }
   return url.replace(/\/+$/, '');
@@ -76,7 +75,6 @@ export const AuthProvider = ({ children }) => {
         return { success: false, error: errData.message || errData.error || 'Invalid email or password.' };
       }
     } catch (err) {
-      console.error('Login request failed:', err);
       return { success: false, error: 'Unable to connect to authentication server. Please check your network connection.' };
     }
   };
@@ -108,7 +106,6 @@ export const AuthProvider = ({ children }) => {
         return { success: false, error: errData.message || errData.error || 'Failed to create account.' };
       }
     } catch (err) {
-      console.error('Signup request failed:', err);
       return { success: false, error: 'Unable to connect to server. Please check your network connection.' };
     }
   };

@@ -66,25 +66,33 @@ function AdminDashboard() {
     status: 'AVAILABLE'
   });
 
+  const [error, setError] = useState('');
+
   const loadAdminData = async () => {
     setLoading(true);
-    const [locs, bks, sess, usrList, dispList, setList, statData] = await Promise.all([
-      apiService.getLocations(),
-      apiService.getAllBookings(),
-      apiService.getAllSessions(),
-      apiService.getAllUsers(),
-      apiService.getAllDisputes(),
-      apiService.getSettings(),
-      apiService.getAdminStats()
-    ]);
-    setLocations(locs || []);
-    setBookings(bks || []);
-    setSessions(sess || []);
-    setUsers(usrList || []);
-    setDisputes(dispList || []);
-    setSettings(setList || []);
-    setStats(statData);
-    setLoading(false);
+    setError('');
+    try {
+      const [locs, bks, sess, usrList, dispList, setList, statData] = await Promise.all([
+        apiService.getLocations(),
+        apiService.getAllBookings(),
+        apiService.getAllSessions(),
+        apiService.getAllUsers(),
+        apiService.getAllDisputes(),
+        apiService.getSettings(),
+        apiService.getAdminStats()
+      ]);
+      setLocations(locs || []);
+      setBookings(bks || []);
+      setSessions(sess || []);
+      setUsers(usrList || []);
+      setDisputes(dispList || []);
+      setSettings(setList || []);
+      setStats(statData);
+    } catch (err) {
+      setError('Unable to load admin telemetry. Please check your connection and try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -95,8 +103,7 @@ function AdminDashboard() {
     e.preventDefault();
     if (!newLocation.name || !newLocation.address) return;
 
-    const data = await apiService.createLocation(newLocation);
-    console.log(data);
+    await apiService.createLocation(newLocation);
     setShowAddLocationModal(false);
     setNewLocation({
       name: '',
@@ -174,18 +181,6 @@ function AdminDashboard() {
           <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: '1.6', marginBottom: '28px' }}>
             You are currently browsing in <strong>{role}</strong> mode. Access to executive telemetry, owner verification desks, and platform pricing parameters requires Administrator credentials.
           </p>
-
-          <div style={{ display: 'flex', gap: '14px', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <button 
-              className="btn btn-primary btn-lg" 
-              onClick={() => {
-                switchRole('ADMIN');
-                loadAdminData();
-              }}
-            >
-              <Sparkles size={18} /> Switch to Admin Access Mode
-            </button>
-          </div>
         </div>
       </div>
     );
@@ -594,6 +589,45 @@ function AdminDashboard() {
                     <option value="AUTO">AUTO (Instant)</option>
                     <option value="MANUAL">MANUAL (Review)</option>
                   </select>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', marginBottom: '6px', color: 'var(--text-muted)' }}>
+                  LOCATION IMAGE (UPLOAD FILE OR PASTE URL)
+                </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="input-field"
+                    onChange={(e) => {
+                      const file = e.target.files[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          setNewLocation({ ...newLocation, image_url: reader.result });
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                  />
+                  <input
+                    type="url"
+                    placeholder="Or paste image URL (https://...)"
+                    className="input-field"
+                    value={newLocation.image_url || ''}
+                    onChange={(e) => setNewLocation({ ...newLocation, image_url: e.target.value })}
+                  />
+                  {newLocation.image_url && (
+                    <div style={{ marginTop: '4px', textAlign: 'center' }}>
+                      <img
+                        src={newLocation.image_url}
+                        alt="Location Preview"
+                        style={{ width: '100%', maxHeight: '110px', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--border-strong)' }}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 
