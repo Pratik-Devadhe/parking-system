@@ -18,6 +18,7 @@ pool.query(`
 
 module.exports.createBooking = async (req, res) => {
     const client = await pool.connect();
+
     try {
         const {
             user_id,
@@ -30,120 +31,281 @@ module.exports.createBooking = async (req, res) => {
 
         await client.query("BEGIN");
 
-        // 0. Check vehicle registration
+        // =====================================================
+        // 0. Validate required fields
+        // =====================================================
         if (!vehicle_id) {
             await client.query("ROLLBACK");
-            return res.status(400).json({ message: "Vehicle is not registered. Please register your vehicle first in 'My Vehicles'." });
+            return res.status(400).json({
+                message: "Vehicle is not registered. Please register your vehicle first in 'My Vehicles'."
+            });
         }
 
-        const vehRes = await client.query(`SELECT id FROM vehicles WHERE id = $1`, [vehicle_id]);
+        if (!slot_id) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({
+                message: "Parking slot is required."
+            });
+        }
+
+        // =====================================================
+        // 1. Check vehicle registration
+        // =====================================================
+        const vehRes = await client.query(
+            `SELECT id, vehicle_number, vehicle_type
+             FROM vehicles
+             WHERE id = $1
+             AND user_id = $2`,
+            [vehicle_id, user_id]
+        );
+
         if (vehRes.rows.length === 0) {
             await client.query("ROLLBACK");
-            return res.status(400).json({ message: "Vehicle is not registered. Please register your vehicle first in 'My Vehicles'." });
+
+            return res.status(400).json({
+                message: "Vehicle is not registered or does not belong to this user. Please select a registered vehicle."
+            });
         }
 
-        // 1. Check slot status and timeframe overlap
-        const slotCheck = await client.query(`SELECT status FROM parking_slots WHERE id = $1`, [slot_id]);
+        const vehicle = vehRes.rows[0];
+
+        // =====================================================
+        // 2. Check parking slot and vehicle compatibility
+        // =====================================================
+        const slotCheck = await client.query(
+            `SELECT 
+                ps.id,
+                ps.slot_number,
+                ps.vehicle_type,
+                ps.status,
+                pl.name AS location_name
+             FROM parking_slots ps
+             JOIN parking_locations pl 
+                ON ps.location_id = pl.id
+             WHERE ps.id = $1`,
+            [slot_id]
+        );
+
         if (slotCheck.rows.length === 0) {
             await client.query("ROLLBACK");
-            return res.status(404).json({ message: "Parking slot not found." });
-        }
-        if (slotCheck.rows[0].status === 'MAINTENANCE' || slotCheck.rows[0].status === 'BLOCKED') {
-            await client.query("ROLLBACK");
-            return res.status(400).json({ message: `Slot is currently under ${slotCheck.rows[0].status} and cannot be booked.` });
+
+            return res.status(404).json({
+                message: "Parking slot not found."
+            });
         }
 
+        const slot = slotCheck.rows[0];
+
+        // =====================================================
+        // 2.1 VEHICLE TYPE COMPATIBILITY CHECK
+        // =====================================================
+        if (vehicle.vehicle_type !== slot.vehicle_type) {
+            await client.query("ROLLBACK");
+
+            const vehicleType =
+                vehicle.vehicle_type === "TWO_WHEELER"
+                    ? "Two Wheeler"
+                    : "Four Wheeler";
+
+            const slotType =
+                slot.vehicle_type === "TWO_WHEELER"
+                    ? "Two Wheeler"
+                    : "Four Wheeler";
+
+            return res.status(400).json({
+                message: `Vehicle-slot mismatch. Your selected vehicle (${vehicle.vehicle_number}) is a ${vehicleType}, but slot ${slot.slot_number} is available only for ${slotType}s.`,
+                error: "VEHICLE_TYPE_MISMATCH",
+                vehicle_type: vehicle.vehicle_type,
+                slot_vehicle_type: slot.vehicle_type,
+                suggestion: `Please select a ${slotType} vehicle or choose another parking slot.`
+            });
+        }
+
+        // =====================================================
+        // 3. Check slot status
+        // =====================================================
+        if (
+            slot.status === "MAINTENANCE" ||
+            slot.status === "BLOCKED"
+        ) {
+            await client.query("ROLLBACK");
+
+            return res.status(400).json({
+                message: `Slot is currently under ${slot.status} and cannot be booked.`
+            });
+        }
+
+        // =====================================================
+        // 4. Check booking timeframe overlap
+        // =====================================================
         const availability = await client.query(
-            `SELECT id FROM bookings
+            `SELECT id
+             FROM bookings
              WHERE slot_id = $1
-             AND booking_status IN ('PENDING', 'CONFIRMED', 'BLOCKED')
+             AND booking_status IN (
+                 'PENDING',
+                 'CONFIRMED',
+                 'ACTIVE',
+                 'BLOCKED'
+             )
              AND start_time < $3
              AND end_time > $2`,
             [slot_id, start_time, end_time]
         );
 
-        if (availability.rows.length) {
+        if (availability.rows.length > 0) {
             await client.query("ROLLBACK");
-            return res.status(400).json({ message: "Slot is already booked or reserved for this time slot." });
+
+            return res.status(400).json({
+                message: "Slot is already booked or reserved for this time slot.",
+                error: "SLOT_NOT_AVAILABLE",
+                suggestion: "Please choose another parking slot or select a different time."
+            });
         }
 
-        // 2. Determine approval mode of location
+        // =====================================================
+        // 5. Determine approval mode of location
+        // =====================================================
         const locRes = await client.query(
-            `SELECT pl.approval_mode, pl.name AS location_name, pl.owner_id 
+            `SELECT 
+                pl.approval_mode,
+                pl.name AS location_name,
+                pl.owner_id
              FROM parking_slots ps
-             JOIN parking_locations pl ON ps.location_id = pl.id
+             JOIN parking_locations pl 
+                ON ps.location_id = pl.id
              WHERE ps.id = $1`,
             [slot_id]
         );
 
-        const approvalMode = locRes.rows[0]?.approval_mode || 'AUTO';
-        const locationName = locRes.rows[0]?.location_name || 'Parking Garage';
+        const approvalMode = locRes.rows[0]?.approval_mode || "AUTO";
+        const locationName =
+            locRes.rows[0]?.location_name || "Parking Garage";
         const ownerId = locRes.rows[0]?.owner_id;
-        const initialStatus = (approvalMode === 'MANUAL') ? 'PENDING' : 'CONFIRMED';
 
-        // 3. Insert booking
+        const initialStatus =
+            approvalMode === "MANUAL"
+                ? "PENDING"
+                : "CONFIRMED";
+
+        // =====================================================
+        // 6. Insert booking
+        // =====================================================
         const booking = await client.query(
-            `INSERT INTO bookings (user_id, vehicle_id, slot_id, start_time, end_time, booking_status, total_amount)
+            `INSERT INTO bookings (
+                user_id,
+                vehicle_id,
+                slot_id,
+                start_time,
+                end_time,
+                booking_status,
+                total_amount
+             )
              VALUES ($1, $2, $3, $4, $5, $6, $7)
              RETURNING *`,
-            [user_id, vehicle_id, slot_id, start_time, end_time, initialStatus, total_amount]
+            [
+                user_id,
+                vehicle_id,
+                slot_id,
+                start_time,
+                end_time,
+                initialStatus,
+                total_amount
+            ]
         );
 
         const newBooking = booking.rows[0];
 
-        // 4. Update slot status if instant confirmed
-        if (initialStatus === 'CONFIRMED') {
-            await client.query(`UPDATE parking_slots SET status = 'RESERVED' WHERE id = $1`, [slot_id]);
+        // =====================================================
+        // 7. Update slot status if instantly confirmed
+        // =====================================================
+        if (initialStatus === "CONFIRMED") {
+            await client.query(
+                `UPDATE parking_slots
+                 SET status = 'RESERVED',
+                     updated_at = CURRENT_TIMESTAMP
+                 WHERE id = $1`,
+                [slot_id]
+            );
         }
 
         await client.query("COMMIT");
 
-        // 5. Trigger Notifications
-        if (initialStatus === 'CONFIRMED') {
+        // =====================================================
+        // 8. Trigger notifications
+        // =====================================================
+        if (initialStatus === "CONFIRMED") {
+
             await createNotificationHelper(
                 user_id,
-                'Booking Confirmed!',
+                "Booking Confirmed!",
                 `Your parking reservation at ${locationName} is confirmed for ${new Date(start_time).toLocaleString()}.`,
-                'BOOKING_CONFIRMED'
+                "BOOKING_CONFIRMED"
             );
+
         } else {
+
             await createNotificationHelper(
                 user_id,
-                'Booking Request Submitted',
+                "Booking Request Submitted",
                 `Your reservation request at ${locationName} is pending owner approval.`,
-                'REMINDER'
+                "REMINDER"
             );
 
             if (ownerId) {
                 await createNotificationHelper(
                     ownerId,
-                    'New Booking Approval Needed',
+                    "New Booking Approval Needed",
                     `A new booking request #${newBooking.id} is waiting for your review.`,
-                    'REMINDER'
+                    "REMINDER"
                 );
             }
         }
 
-        res.status(201).json({
-            message: initialStatus === 'CONFIRMED' ? "Booking Created Successfully" : "Booking Request Submitted for Owner Approval",
+        // =====================================================
+        // 9. Response
+        // =====================================================
+        return res.status(201).json({
+            message:
+                initialStatus === "CONFIRMED"
+                    ? "Booking Created Successfully"
+                    : "Booking Request Submitted for Owner Approval",
+
             booking: newBooking
         });
 
     } catch (err) {
+
         await client.query("ROLLBACK");
-        res.status(500).json({ error: err.message });
+
+        // Handle PostgreSQL exclusion constraint
+        // in case two requests attempt to book the same slot
+        // simultaneously.
+        if (err.code === "23P01") {
+            return res.status(409).json({
+                message: "This parking slot was just booked for the selected time. Please choose another slot or time.",
+                error: "BOOKING_OVERLAP"
+            });
+        }
+
+        console.error("Create booking error:", err);
+
+        return res.status(500).json({
+            error: "Failed to create booking.",
+            message: err.message
+        });
+
     } finally {
         client.release();
     }
 };
-
 module.exports.checkAvailability = async (req, res) => {
     try {
         const { slot_id, start_time, end_time } = req.body;
         const result = await pool.query(
             `SELECT * FROM bookings
              WHERE slot_id = $1
-             AND booking_status IN ('PENDING','CONFIRMED','BLOCKED')
+             AND booking_status IN ('PENDING','CONFIRMED','ACTIVE','BLOCKED')
              AND start_time < $3
              AND end_time > $2`,
             [slot_id, start_time, end_time]
@@ -334,7 +496,7 @@ module.exports.blockSlotTimeframe = async (req, res) => {
         const availability = await client.query(
             `SELECT id FROM bookings
              WHERE slot_id = $1
-             AND booking_status IN ('PENDING', 'CONFIRMED', 'BLOCKED')
+             AND booking_status IN ('PENDING', 'CONFIRMED', 'ACTIVE', 'BLOCKED')
              AND start_time < $3 AND end_time > $2`,
             [slot_id, start_time, end_time]
         );

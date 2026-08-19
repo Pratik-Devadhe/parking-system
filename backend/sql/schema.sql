@@ -162,7 +162,7 @@ CREATE TABLE IF NOT EXISTS bookings (
     end_time TIMESTAMP NOT NULL,
 
     booking_status VARCHAR(20) DEFAULT 'PENDING'
-        CHECK(booking_status IN ('PENDING','CONFIRMED','CANCELLED','COMPLETED','BLOCKED')),
+        CHECK(booking_status IN ('PENDING','CONFIRMED','ACTIVE','CANCELLED','COMPLETED','BLOCKED')),
         -- 'BLOCKED' used for owner blocking slot timeframes
 
     total_amount DECIMAL(10,2),
@@ -201,7 +201,7 @@ CREATE TABLE IF NOT EXISTS bookings (
     -- The backend MUST also validate before INSERT:
     --   SELECT * FROM bookings
     --   WHERE slot_id = $1
-    --     AND booking_status IN ('CONFIRMED','PENDING')
+    --     AND booking_status IN ('CONFIRMED','PENDING','ACTIVE')
     --     AND start_time < $newEnd
     --     AND end_time > $newStart;
     --   → If rows exist → REJECT booking.
@@ -210,7 +210,7 @@ CREATE TABLE IF NOT EXISTS bookings (
         EXCLUDE USING gist (
             slot_id WITH =,
             tsrange(start_time, end_time) WITH &&
-        ) WHERE (booking_status IN ('PENDING', 'CONFIRMED', 'BLOCKED'))
+        ) WHERE (booking_status IN ('PENDING', 'CONFIRMED', 'ACTIVE', 'BLOCKED'))
 );
 
 -- =========================
@@ -350,7 +350,7 @@ CREATE INDEX IF NOT EXISTS idx_location_geo ON parking_locations USING GIST (loc
 
 -- Booking date range query speed (partial index on active bookings only)
 CREATE INDEX IF NOT EXISTS idx_booking_timeframes ON bookings(slot_id, start_time, end_time) 
-WHERE booking_status IN ('PENDING', 'CONFIRMED', 'BLOCKED');
+WHERE booking_status IN ('PENDING', 'CONFIRMED', 'ACTIVE', 'BLOCKED');
 
 -- =============================================
 -- AUTO-UPDATE updated_at TRIGGER FUNCTION
